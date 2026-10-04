@@ -11,3 +11,13 @@ Download **PhoneScreen-1.1.0-win64.zip**, extract it and run **PhoneScreen.exe**
 - **New look.** Dark interface with a dark title bar, four stream profiles, clipboard sharing and always-on-top options, correct scaling on high-DPI screens.
 
 `PhoneScreen.exe` on its own can download scrcpy with one click. The FFmpeg and libusb archives are the source code for the bundled libraries and aren't needed to run the app. `SHA256SUMS.txt` lists checksums for every file.
+
+### Check your download
+
+These files were built by GitHub Actions from the `v1.1.0` source, not on a personal PC. To confirm, install the [GitHub CLI](https://cli.github.com/) and run:
+
+```
+gh attestation verify PhoneScreen-1.1.0-win64.zip -R jytt8u/PhoneScreen
+```
+
+Or skip the download entirely and [build it from source](https://github.com/jytt8u/PhoneScreen#building-from-source).
