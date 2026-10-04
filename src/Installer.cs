@@ -19,14 +19,14 @@ namespace PhoneScreen {
             while (current != null) {
                 if ((Directory.Exists(current) || File.Exists(current)) &&
                     (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                    throw new IOException("Ссылки и точки перенаправления в папках программы не поддерживаются: " + current);
+                    throw new IOException("Links and reparse points are not supported in application directories: " + current);
                 current = Path.GetDirectoryName(current);
             }
         }
         public static void DeleteChild(string parent, string child) {
             string root = Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             string target = Path.GetFullPath(child);
-            if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new IOException("Небезопасный путь очистки.");
+            if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new IOException("Unsafe cleanup path.");
             CheckPath(target);
             if (Directory.Exists(target)) Directory.Delete(target, true);
             else if (File.Exists(target)) File.Delete(target);
@@ -53,11 +53,11 @@ namespace PhoneScreen {
         public static Dictionary<string, string> RuntimeManifest() {
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("PhoneScreen.runtime.sha256")) {
-                if (stream == null) throw new IOException("В сборке отсутствует список контрольных сумм движка.");
+                if (stream == null) throw new IOException("The embedded runtime checksum manifest is missing.");
                 using (var reader = new StreamReader(stream, Encoding.UTF8)) {
                     string line;
                     while ((line = reader.ReadLine()) != null) {
-                        if (line.Length < 67 || line.Substring(64, 2) != "  ") throw new IOException("Неверный список контрольных сумм.");
+                        if (line.Length < 67 || line.Substring(64, 2) != "  ") throw new IOException("Invalid checksum manifest.");
                         result.Add(line.Substring(66), line.Substring(0, 64));
                     }
                 }
@@ -84,7 +84,7 @@ namespace PhoneScreen {
                         string relative = file.Substring(directory.TrimEnd(Path.DirectorySeparatorChar).Length + 1).Replace('\\', '/');
                         // Old versions wrote this marker. It never grants execution permission.
                         if (relative == ".verified") continue;
-                        if (!expected.ContainsKey(relative)) throw new IOException("Неизвестный файл в папке движка: " + relative);
+                        if (!expected.ContainsKey(relative)) throw new IOException("Unexpected runtime file: " + relative);
                     }
                 }
                 foreach (var item in expected) {
@@ -94,7 +94,7 @@ namespace PhoneScreen {
                     handles.Add(file);
                     using (var sha = SHA256.Create()) {
                         string actual = BitConverter.ToString(sha.ComputeHash(file)).Replace("-", "").ToLowerInvariant();
-                        if (actual != item.Value) throw new IOException("Изменён файл движка: " + item.Key + ". Установи официальный архив заново.");
+                        if (actual != item.Value) throw new IOException("Modified runtime file: " + item.Key + ". Reinstall the official archive.");
                     }
                 }
                 return new RuntimeLease(handles);
@@ -117,31 +117,31 @@ namespace PhoneScreen {
             }
             string partial = Path.Combine(cache, "download-" + Guid.NewGuid().ToString("N") + ".part");
             try {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
                 using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
                 using (var handler = new HttpClientHandler { AllowAutoRedirect = false })
                 using (var client = new HttpClient(handler)) {
                     timeout.CancelAfter(180000);
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("PhoneScreen/1.0");
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("PhoneScreen/1.1");
                     Uri uri = new Uri(Download);
                     for (int redirect = 0; redirect < 6; redirect++) {
-                        if (!AllowedDownloadUri(uri)) throw new IOException("Отклонён неподдерживаемый адрес загрузки.");
+                        if (!AllowedDownloadUri(uri)) throw new IOException("Unsupported download address rejected.");
                         using (var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeout.Token)) {
                             int code = (int)response.StatusCode;
                             if (code >= 300 && code <= 399) {
-                                if (response.Headers.Location == null) throw new IOException("Не удалось получить адрес архива.");
+                                if (response.Headers.Location == null) throw new IOException("The archive download address is unavailable.");
                                 uri = response.Headers.Location.IsAbsoluteUri ? response.Headers.Location : new Uri(uri, response.Headers.Location);
                                 continue;
                             }
                             response.EnsureSuccessStatusCode();
                             long total = response.Content.Headers.ContentLength ?? -1;
-                            if (total > MaxDownload) throw new IOException("Архив превышает допустимый размер.");
+                            if (total > MaxDownload) throw new IOException("The archive exceeds the permitted size.");
                             using (var incoming = await response.Content.ReadAsStreamAsync())
                             using (var outgoing = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true)) {
                                 var buffer = new byte[65536]; long received = 0; int read; int lastProgress = -1;
                                 while ((read = await incoming.ReadAsync(buffer, 0, buffer.Length, timeout.Token)) != 0) {
                                     received += read;
-                                    if (received > MaxDownload) throw new IOException("Архив превышает допустимый размер.");
+                                    if (received > MaxDownload) throw new IOException("The archive exceeds the permitted size.");
                                     await outgoing.WriteAsync(buffer, 0, read, timeout.Token);
                                     int value = total > 0 ? (int)Math.Min(99, received * 100 / total) : 0;
                                     if (progress != null && value != lastProgress) { progress.Report(value); lastProgress = value; }
@@ -155,7 +155,7 @@ namespace PhoneScreen {
                             return;
                         }
                     }
-                    throw new IOException("Слишком много перенаправлений при загрузке.");
+                    throw new IOException("Too many download redirects.");
                 }
             } finally { FileSafety.DeleteChild(cache, partial); }
         }

@@ -1,11 +1,13 @@
-Экран Android на Windows, управление мышью и клавиатурой, звук на компьютере — по Wi-Fi.
+See and control your Android phone from Windows, with sound, over Wi-Fi.
 
-**Скачай PhoneScreen-1.0.0-win64.zip**, распакуй и открой PhoneScreen.exe. Движок scrcpy уже внутри. Нужны Windows 10/11 x64 с .NET Framework 4.8 и Android 11+.
+Download **PhoneScreen-1.1.0-win64.zip**, extract it and run **PhoneScreen.exe**. scrcpy is included. Requires Windows 10/11 x64 and Android 11 or newer.
 
-Для первого подключения включи беспроводную отладку на телефоне, выполни сопряжение по коду и введи адрес подключения с основного экрана отладки. Два порта обычно отличаются.
+### What's new
 
-Отдельный PhoneScreen.exe — компактный вариант с автоматической загрузкой scrcpy при первом запуске. Архивы исходников FFmpeg и libusb относятся к лицензиям зависимостей; для запуска они не нужны.
+- **Finds your phone by itself.** Turn on Wireless debugging and press Connect. No IP addresses or ports to copy, even after Android changes the port.
+- **QR pairing.** Scan the code once and the phone screen opens.
+- **More reliable sound.** The picture keeps going if audio capture fails, phones without Opus switch to AAC automatically, and the buffers are tuned for Wi-Fi.
+- **Stays connected.** Dropped Wi-Fi is detected within seconds and the stream reconnects.
+- **New look.** Dark interface with a dark title bar, four stream profiles, clipboard sharing and always-on-top options, correct scaling on high-DPI screens.
 
-В выпуске: обновлённый интерфейс, загрузка с проверкой SHA-256, защита TLS в активном соединении, проверка и блокировка файлов движка от изменения, профили качества и настройки аудио. Прошли 66 локальных проверок и проверка загрузки/установки. Трансляция на физическом телефоне пока не проверена.
-
-Контрольные суммы файлов находятся в SHA256SUMS.txt. Подробная инструкция и сведения о безопасности — в репозитории.
+`PhoneScreen.exe` on its own can download scrcpy with one click. The FFmpeg and libusb archives are the source code for the bundled libraries and aren't needed to run the app. `SHA256SUMS.txt` lists checksums for every file.

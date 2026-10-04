@@ -1,22 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340">
-  <rect width="1200" height="340" rx="24" fill="#0e141a"/>
-  <path d="M0 290H1200M790 0V340" stroke="#24313d"/>
-  <text x="48" y="57" fill="#71dfb8" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="3">ANDROID → WINDOWS</text>
-  <text x="43" y="140" fill="#f0f4f8" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="76" letter-spacing="-3">PhoneScreen</text>
-  <text x="48" y="188" fill="#a8b6c5" font-family="Segoe UI,Arial,sans-serif" font-size="25">Твой телефон. На большом экране.</text>
-  <g fill="#71dfb8" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="1.5">
-    <text x="48" y="256">ЭКРАН</text><text x="154" y="256">УПРАВЛЕНИЕ</text>
-    <text x="319" y="256">ЗВУК</text><text x="412" y="256">WI-FI</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360">
+  <rect width="1200" height="360" rx="18" fill="#0e141a"/>
+  <path d="M0 304H1200M754 0V360" stroke="#26353a"/>
+  <text x="48" y="51" fill="#7fdeba" font-family="Segoe UI,Arial,sans-serif" font-size="12" letter-spacing="3">ANDROID, ON YOUR DESKTOP</text>
+  <text x="43" y="143" fill="#f0f6f8" font-family="Segoe UI,Arial,sans-serif" font-size="77" font-weight="700" letter-spacing="-3">PhoneScreen</text>
+  <text x="48" y="197" fill="#b5c3c9" font-family="Segoe UI,Arial,sans-serif" font-size="28">Your phone. A little more room.</text>
+  <text x="48" y="269" fill="#7fdeba" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="1">SCREEN  /  INPUT  /  AUDIO  /  WI-FI</text>
+  <text x="48" y="338" fill="#93a8af" font-family="Segoe UI,Arial,sans-serif" font-size="13">Small Windows launcher. Local connection. No account.</text>
+  <g fill="#18252c" stroke="#456367" stroke-width="2">
+    <rect x="800" y="60" width="337" height="201" rx="14"/>
+    <path d="M940 262v24h51v-24M899 288h134" fill="none"/>
+    <rect x="1048" y="137" width="94" height="173" rx="17" fill="#10201c" stroke="#7fdeba"/>
   </g>
-  <text x="48" y="321" fill="#6f8296" font-family="Segoe UI,Arial,sans-serif" font-size="13">Без аккаунтов. Без облака. Без приложения на телефоне.</text>
-  <g fill="#141f29" stroke="#3a5363" stroke-width="3">
-    <rect x="826" y="66" width="310" height="185" rx="13"/>
-    <path d="M957 251V275H1004V251M919 276H1041" fill="none"/>
-    <rect x="1048" y="138" width="87" height="158" rx="14" stroke="#71dfb8"/>
+  <g fill="none" stroke="#7fdeba" stroke-linecap="round">
+    <path d="M830 201C857 119 894 257 929 165S984 213 1021 108" stroke-width="4"/>
+    <path d="M1063 247C1079 201 1095 285 1123 202" stroke-width="3"/>
+    <path d="M1077 154h34" stroke-width="3"/>
   </g>
-  <g fill="none" stroke="#71dfb8" stroke-width="5" stroke-linecap="round">
-    <path d="M859 190C883 116 913 239 945 161S995 206 1020 118"/>
-    <path d="M1063 242C1077 195 1091 271 1107 206" stroke-width="3"/>
-  </g>
-  <path d="M1074 153H1108" stroke="#71dfb8" stroke-width="3" stroke-linecap="round"/>
 </svg>

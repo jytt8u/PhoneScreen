@@ -156,17 +156,53 @@ static class Tests {
                 Check(!Package.AllowedDownloadUri(new Uri(badUri)), "reject download redirect " + badUri);
             Check(Package.AllowedDownloadUri(new Uri(Package.Download)), "pinned official download URL accepted");
             Check(Package.RuntimeManifest().ContainsKey("adb.exe"), "runtime manifest embedded in executable");
-            string args = Engine.MirrorArguments("127.0.0.1:42000", 0, true, false, true, true, false, "opus");
-            Check(args.Contains("--require-audio") && args.Contains("--audio-source=output"), "audio failures cannot silently produce video only");
-            Check(args.Contains("--no-clipboard-autosync"), "automatic clipboard synchronization disabled");
-            Check(args.Contains("--keyboard=uhid"), "Unicode-capable keyboard enabled");
-            args = Engine.MirrorArguments("127.0.0.1:42000", 1, false, false, false, true, true, "aac");
+            var preferences = new StreamPreferences { Quality = 3, Codec = 1, Audio = AudioMode.Both, Control = false, Keyboard = false, ScreenOff = true, Clipboard = true, OnTop = true };
+            var restored = StreamPreferences.Parse(preferences.Encode());
+            Check(restored.Quality == 3 && restored.Codec == 1 && restored.Audio == AudioMode.Both && !restored.Control && !restored.Keyboard && restored.ScreenOff && restored.Clipboard && restored.OnTop, "stream preferences round trip");
+            foreach (string invalidPreferences in new[] { "", "3|0|1|0|1|1|0|0|0", "2|9|1|0|1|1|0|0|0", "2|0|3|0|1|1|0|0|0", "2|0|1|0|1|1|0|0|oops", "1|0|1|0|1|1|0|9" }) {
+                var defaults = StreamPreferences.Parse(invalidPreferences);
+                Check(defaults.Quality == 0 && defaults.Codec == 0 && defaults.Audio == AudioMode.Computer && defaults.Control && defaults.Keyboard && !defaults.ScreenOff && !defaults.Clipboard && !defaults.OnTop, "malformed preferences fall back to safe defaults");
+            }
+            var migrated = StreamPreferences.Parse("1|1|1|1|1|0|1|1");
+            Check(migrated.Quality == 2 && migrated.Audio == AudioMode.Both && migrated.Codec == 1 && !migrated.Keyboard && migrated.ScreenOff, "1.0 preferences migrate to the new format");
+            var device = SavedDevice.Parse(new SavedDevice { Service = "adb-R5CW71-Qp8sZt", Model = "Galaxy S23", Address = "192.168.1.42:37105" }.Encode());
+            Check(device.Service == "adb-R5CW71-Qp8sZt" && device.Model == "Galaxy S23" && device.Address == "192.168.1.42:37105", "saved phone round trip");
+            device = SavedDevice.Parse("1\nadb x;rm\nPhone\" --no-control\n8.8.8.8:4000");
+            Check(device.Service == "" && device.Address == "" && !device.Model.Contains("\"") && !device.Model.Contains(";"), "tampered saved phone is sanitised");
+            Check(SavedDevice.CleanModel("Pixel 8 Pro\" --record=x.mp4").IndexOf("\"") < 0, "device model cannot inject scrcpy options");
+
+            var options = new StreamOptions();
+            string args = Engine.MirrorArguments("127.0.0.1:42000", options);
+            Check(!args.Contains("--require-audio") && args.Contains("--audio-source=output") && args.Contains("--audio-buffer=80"), "a failed audio capture keeps the picture; audio is buffered for Wi-Fi");
+            Check(args.Contains("--no-clipboard-autosync"), "clipboard sharing is off by default");
+            Check(args.Contains("--keyboard=uhid"), "layout-aware keyboard enabled");
+            Check(args.Contains("--window-title=\"PhoneScreen\""), "window title defaults to the app name");
+            options = new StreamOptions { Profile = 2, Audio = AudioMode.Off, Control = false, ScreenOff = true, Clipboard = true };
+            args = Engine.MirrorArguments("127.0.0.1:42000", options);
             Check(args.Contains("--no-control") && args.Contains("--no-audio") && !args.Contains("--keyboard") && !args.Contains("--turn-screen-off"), "view only does not alter phone or inject input");
-            Check(args.Contains("--max-fps=30") && args.Contains("--video-bit-rate=4M"), "weak Wi-Fi profile reduces bandwidth");
-            args = Engine.MirrorArguments("127.0.0.1:42000", 2, true, true, true, false, false, "aac");
-            Check(args.Contains("--audio-dup") && args.Contains("--audio-codec=aac") && args.Contains("--video-buffer=120"), "duplicate audio and video profile configured");
-            Reject(() => Engine.MirrorArguments("192.168.1.2:40000", 0, true, false, true, true, false, "opus"), "scrcpy cannot bypass TLS bridge");
-            Reject(() => Engine.MirrorArguments("127.0.0.1:42000", 0, true, false, true, true, false, "opus --no-control"), "audio codec injection rejected");
+            Check(args.Contains("--max-fps=30") && args.Contains("--video-bit-rate=3M") && args.Contains("--no-clipboard-autosync"), "weak Wi-Fi profile reduces bandwidth");
+            args = Engine.MirrorArguments("127.0.0.1:42000", new StreamOptions { Profile = 3, Audio = AudioMode.Both, Codec = "aac", Clipboard = true, OnTop = true, Title = "Pixel \"8\" --otg" });
+            Check(args.Contains("--audio-source=playback --audio-dup") && args.Contains("--audio-codec=aac") && args.Contains("--video-buffer=150") && args.Contains("--audio-buffer=150"), "movie profile keeps audio and video in sync");
+            Check(!args.Contains("--no-clipboard-autosync") && args.Contains("--always-on-top") && !args.Contains(" --otg ") && args.Contains("--window-title=\"Pixel 8 --otg\""), "options applied, title quoted and sanitised");
+            Check(Engine.MirrorArguments("127.0.0.1:42000", new StreamOptions { Profile = 1 }).Contains("--audio-buffer=50"), "responsive profile uses the shortest audio buffer");
+            Reject(() => Engine.MirrorArguments("192.168.1.2:40000", new StreamOptions()), "scrcpy cannot bypass TLS bridge");
+            Reject(() => Engine.MirrorArguments("127.0.0.1:42000", new StreamOptions { Codec = "opus --no-control" }), "audio codec injection rejected");
+            Reject(() => Engine.MirrorArguments("127.0.0.1:42000", new StreamOptions { Profile = 4 }), "unknown profile rejected");
+
+            var found = Mdns.Parse("List of discovered mdns services\r\nadb-R5CW71-Qp8sZt\t_adb-tls-connect._tcp\t192.168.1.42:37105\r\n"
+                + "phonescreen-abcd2345\t_adb-tls-pairing._tcp\t192.168.1.42:40111\n"
+                + "adb-R5CW71-Qp8sZt\t_adb-tls-connect._tcp\t192.168.1.42:37105\n"
+                + "evil;rm\t_adb-tls-connect._tcp\t192.168.1.50:37000\n"
+                + "adb-public\t_adb-tls-connect._tcp\t8.8.8.8:37000\n"
+                + "adb-legacy\t_adb._tcp\t192.168.1.9:5555\n");
+            Check(found.Count == 2 && !found[0].Pairing && found[0].Address.ToString() == "192.168.1.42:37105" && found[1].Pairing && found[1].Name == "phonescreen-abcd2345", "mDNS services parsed, duplicates and unsafe entries dropped");
+            Check(Mdns.PairedGuid("Successfully paired to 192.168.1.42:40111 [guid=adb-R5CW71-Qp8sZt]") == "adb-R5CW71-Qp8sZt" && Mdns.PairedGuid("[guid=a b]") == null, "pairing GUID extracted safely");
+            var ticket = PairingTicket.Create();
+            var other = PairingTicket.Create();
+            Check(System.Text.RegularExpressions.Regex.IsMatch(ticket.Payload, "^WIFI:T:ADB;S:phonescreen-[A-Za-z0-9]{8};P:[A-Za-z0-9]{12};;$") && ticket.Password != other.Password, "QR pairing tickets are random and well-formed");
+            var matrix = QrCode.Encode(ticket.Payload);
+            Check(matrix.GetLength(0) == 33 && matrix[0, 0] && matrix[6, 6] && !matrix[7, 7] && matrix[3, 29] && matrix[29, 3], "QR matrix has version-4 finder patterns");
+            Reject(() => QrCode.Encode(new string((char)65, 200)), "oversized QR payload rejected");
             string scratch = Path.Combine(Path.GetTempPath(), "phonescreen-tests-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(scratch);
             try {

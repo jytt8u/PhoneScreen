@@ -26,14 +26,14 @@ namespace PhoneScreen {
             if (!match.Success || !IPAddress.TryParse(match.Groups[1].Value, out ip)
                 || ip.AddressFamily != AddressFamily.InterNetwork
                 || !Int32.TryParse(match.Groups[2].Value, out port) || port < 1024 || port > 65535) {
-                throw new ArgumentException("Введи адрес с телефона в формате IP:порт, например 192.168.3.42:37001.");
+                throw new ArgumentException("Enter the phone address as IP:port, for example 192.168.1.24:37001.");
             }
             var b = ip.GetAddressBytes();
             bool local = b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
                 || (b[0] == 192 && b[1] == 168);
-            if (!local) throw new ArgumentException("Нужен локальный адрес телефона из домашней сети Wi-Fi.");
+            if (!local) throw new ArgumentException("Use the private phone address on your local Wi-Fi network.");
             // 5555 is conventionally the legacy, unencrypted ADB port.
-            if (port == 5555) throw new ArgumentException("Порт 5555 не используется. Возьми адрес из «Беспроводной отладки» Android 11+.");
+            if (port == 5555) throw new ArgumentException("Legacy port 5555 is not supported. Use Wireless debugging on Android 11+.");
             return new PhoneAddress { IP = ip, Port = port };
         }
     }
@@ -72,7 +72,7 @@ namespace PhoneScreen {
                 if (await Task.WhenAny(check, Task.Delay(timeoutMs)) != check) {
                     client.Close();
                     try { await check; } catch { }
-                    throw new TimeoutException("Телефон не ответил. Проверь Wi-Fi, адрес и включённую беспроводную отладку.");
+                    throw new TimeoutException("The phone did not respond. Check Wi-Fi, the address and Wireless debugging.");
                 }
                 await check;
             }
@@ -86,10 +86,10 @@ namespace PhoneScreen {
             int offset = 0;
             while (offset < response.Length) {
                 int count = await stream.ReadAsync(response, offset, response.Length - offset);
-                if (count == 0) throw new IOException("Соединение закрыто. Используй порт подключения, а не порт сопряжения.");
+                if (count == 0) throw new IOException("Connection closed. Use the connection port, not the pairing port.");
                 offset += count;
             }
-            if (!IsTlsHeader(response)) throw new IOException("Этот порт не подтвердил TLS. Подключение остановлено. Возьми адрес с основного экрана «Беспроводная отладка».");
+            if (!IsTlsHeader(response)) throw new IOException("This port did not confirm TLS. Use the address on the main Wireless debugging screen.");
         }
     }
 
@@ -120,7 +120,7 @@ namespace PhoneScreen {
                     if (await Task.WhenAny(connect, Task.Delay(6000)) != connect) {
                         phone.Close();
                         try { await connect; } catch { }
-                        throw new TimeoutException("Телефон не ответил. Проверь Wi-Fi и адрес подключения.");
+                        throw new TimeoutException("The phone did not respond. Check Wi-Fi and the connection address.");
                     }
                     await connect;
                     phone.ReceiveTimeout = phone.SendTimeout = 6000;
@@ -129,16 +129,17 @@ namespace PhoneScreen {
                     remote.Write(hello, 0, hello.Length);
                     byte[] tlsRequest = ReadExactly(remote, 24);
                     if (!TlsProbe.IsTlsHeader(tlsRequest))
-                        throw new IOException("Порт не подтвердил TLS. Подключение остановлено. Используй адрес с основного экрана «Беспроводная отладка».");
+                        throw new IOException("The port did not confirm TLS. Connection stopped. Use the main Wireless debugging address.");
                     local.Write(tlsRequest, 0, tlsRequest.Length);
                     byte[] tlsReply = ReadExactly(local, 24);
-                    if (!TlsProbe.IsTlsHeader(tlsReply)) throw new IOException("ADB не подтвердил переход на TLS.");
+                    if (!TlsProbe.IsTlsHeader(tlsReply)) throw new IOException("ADB did not confirm the switch to TLS.");
                     remote.Write(tlsReply, 0, tlsReply.Length);
                     // Both ends have committed to TLS. ADB performs mutual authentication.
                     // The actual media transport is gated, not a separate preflight socket.
                     // This bridge never decrypts data and never accepts a legacy AUTH/CNXN reply.
                     host.ReceiveTimeout = host.SendTimeout = 0;
                     phone.ReceiveTimeout = phone.SendTimeout = 0;
+                    EnableKeepAlive(phone.Client);
                     var toPhone = local.CopyToAsync(remote);
                     var toHost = remote.CopyToAsync(local);
                     await Task.WhenAny(toPhone, toHost);
@@ -149,11 +150,21 @@ namespace PhoneScreen {
                 } finally { CloseClients(); try { listener.Stop(); } catch { } }
             });
         }
+        // Notice a phone that left Wi-Fi within seconds instead of waiting for the TCP retransmit timeout.
+        static void EnableKeepAlive(Socket socket) {
+            try {
+                var values = new byte[12];
+                BitConverter.GetBytes(1u).CopyTo(values, 0);
+                BitConverter.GetBytes(4000u).CopyTo(values, 4);
+                BitConverter.GetBytes(1000u).CopyTo(values, 8);
+                socket.IOControl(IOControlCode.KeepAliveValues, values, null);
+            } catch (SocketException) { }
+        }
         static byte[] ReadExactly(Stream stream, int length) {
             var result = new byte[length];
             for (int offset = 0; offset < length;) {
                 int count = stream.Read(result, offset, length - offset);
-                if (count == 0) throw new IOException("Соединение закрыто. Проверь порт подключения; порт сопряжения отличается.");
+                if (count == 0) throw new IOException("Connection closed. Check the connection port; the pairing port is different.");
                 offset += count;
             }
             return result;
@@ -163,7 +174,7 @@ namespace PhoneScreen {
             uint command = BitConverter.ToUInt32(header, 0);
             uint length = BitConverter.ToUInt32(header, 12);
             if (command != 0x4e584e43 || BitConverter.ToUInt32(header, 20) != (command ^ 0xffffffff) || length > 4096)
-                throw new IOException("Неверный заголовок ADB.");
+                throw new IOException("Invalid ADB header.");
             byte[] body = ReadExactly(stream, (int)length);
             var packet = new byte[header.Length + body.Length];
             Buffer.BlockCopy(header, 0, packet, 0, header.Length);
@@ -194,10 +205,10 @@ namespace PhoneScreen {
         public static string SafeDestination(string root, string relative) {
             string fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             if (Path.IsPathRooted(relative) || relative.IndexOf(':') >= 0)
-                throw new IOException("Неверный путь внутри архива.");
+                throw new IOException("Invalid archive path.");
             string path = Path.GetFullPath(Path.Combine(fullRoot, relative));
             if (!path.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
-                throw new IOException("Путь внутри архива выходит за пределы папки установки.");
+                throw new IOException("An archive path escapes the installation directory.");
             return path;
         }
         public static void Install(string zip, string root) {
@@ -210,7 +221,7 @@ namespace PhoneScreen {
                 using (var file = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read)) {
                     using (var sha = SHA256.Create()) {
                         string actual = BitConverter.ToString(sha.ComputeHash(file)).Replace("-", "").ToLowerInvariant();
-                        if (actual != Hash) throw new IOException("SHA-256 не совпал. Нужен официальный scrcpy-win64-v4.1.zip. Этот архив не установлен.");
+                        if (actual != Hash) throw new IOException("SHA-256 mismatch. Use the official scrcpy-win64-v4.1.zip. This archive was not installed.");
                     }
                     file.Position = 0;
                     Directory.CreateDirectory(stage);
@@ -218,7 +229,7 @@ namespace PhoneScreen {
                     const string prefix = "scrcpy-win64-v4.1/";
                     foreach (var entry in archive.Entries) {
                         string name = entry.FullName.Replace('\\', '/');
-                        if (!name.StartsWith(prefix, StringComparison.Ordinal)) throw new IOException("Неожиданная структура архива.");
+                        if (!name.StartsWith(prefix, StringComparison.Ordinal)) throw new IOException("Unexpected archive structure.");
                         string relative = name.Substring(prefix.Length);
                         if (relative.Length == 0) continue;
                         string destination = SafeDestination(stage, relative);
@@ -231,16 +242,24 @@ namespace PhoneScreen {
                     }
                 }
                 foreach (string name in new[] { "scrcpy.exe", "adb.exe", "scrcpy-server" })
-                    if (!File.Exists(Path.Combine(stage, name))) throw new IOException("В архиве отсутствует " + name);
+                    if (!File.Exists(Path.Combine(stage, name))) throw new IOException("The archive is missing " + name);
                 using (AcquireRuntimeDirectory(stage)) { }
                 FileSafety.ProtectDirectory(stage);
-                if (Directory.Exists(target)) throw new IOException("Папка tools\\scrcpy уже существует. Закрой приложение и переименуй эту папку перед переустановкой.");
+                if (Directory.Exists(target)) throw new IOException("The tools\\scrcpy directory already exists. Close PhoneScreen and rename it before reinstalling.");
                 Directory.Move(stage, target);
             } finally {
                 // Both paths are fixed children of the application workspace, never user input.
                 FileSafety.DeleteChild(Path.Combine(root, "tools"), stage);
             }
         }
+    }
+
+    public sealed class StreamOptions {
+        public int Profile;
+        public AudioMode Audio = AudioMode.Computer;
+        public string Codec = "opus";
+        public bool Control = true, Keyboard = true, ScreenOff, Clipboard, OnTop;
+        public string Title = "PhoneScreen";
     }
 
     public sealed class CommandResult {
@@ -260,6 +279,7 @@ namespace PhoneScreen {
         private readonly HashSet<Process> commands = new HashSet<Process>();
         private readonly SemaphoreSlim initialization = new SemaphoreSlim(1, 1);
         private bool disposed;
+        public string IconPath { get; set; }
         public Engine(string root) {
             this.root = root;
             state = Path.Combine(root, ".data");
@@ -315,6 +335,8 @@ namespace PhoneScreen {
             info.EnvironmentVariables.Remove("ANDROID_SERIAL");
             info.EnvironmentVariables.Remove("ADB_TRACE");
             info.EnvironmentVariables.Remove("SCRCPY_SERVER_PATH");
+            info.EnvironmentVariables.Remove("SCRCPY_ICON_PATH");
+            if (exe == "scrcpy.exe" && IconPath != null && File.Exists(IconPath)) info.EnvironmentVariables["SCRCPY_ICON_PATH"] = IconPath;
             info.EnvironmentVariables.Remove("ANDROID_ADB_SERVER_ADDRESS");
             info.EnvironmentVariables.Remove("ANDROID_ADB_SERVER_PORT");
             return info;
@@ -324,7 +346,7 @@ namespace PhoneScreen {
             try {
                 if (disposed) throw new ObjectDisposedException("Engine");
                 if (serverStarted) return;
-                if (!Package.Ready(root)) throw new IOException("Сначала добавь официальный архив scrcpy.");
+                if (!Package.Ready(root)) throw new IOException("Install the official scrcpy runtime first.");
                 if (runtimeLease == null) runtimeLease = Package.AcquireRuntime(root);
                 FileSafety.CheckPath(state);
                 Directory.CreateDirectory(state);
@@ -343,13 +365,18 @@ namespace PhoneScreen {
                 listener.Stop();
                 serverAttempted = true;
                 var start = await RunAsync("adb.exe", "start-server", null, 12000);
-                if (start.ExitCode != 0) throw new IOException("ADB не запустился: " + start.Output);
+                if (start.ExitCode != 0) throw new IOException("ADB could not start: " + start.Output);
                 serverStarted = true;
             } finally { initialization.Release(); }
         }
         public async Task<CommandResult> AdbAsync(string args, string input, int timeoutMs) {
             await InitializeAsync();
             return await RunAsync("adb.exe", args, input, timeoutMs);
+        }
+        // Phones with Wireless debugging enabled announce themselves over mDNS.
+        public async Task<List<PhoneService>> ServicesAsync() {
+            var result = await AdbAsync("mdns services", null, 5000);
+            return result.ExitCode == 0 ? Mdns.Parse(result.Output) : new List<PhoneService>();
         }
         private async Task<CommandResult> RunAsync(string exe, string args, string input, int timeoutMs) {
             using (var process = new Process { StartInfo = StartInfo(exe, args) }) {
@@ -367,7 +394,7 @@ namespace PhoneScreen {
                     if (await Task.WhenAny(wait, Task.Delay(timeoutMs)) != wait) {
                         try { process.Kill(); } catch { }
                         await wait;
-                        throw new TimeoutException("Время ожидания истекло. Проверь телефон и повтори подключение.");
+                        throw new TimeoutException("The request timed out. Check the phone and try again.");
                     }
                     await wait;
                     return new CommandResult { ExitCode = process.ExitCode, Output = ((await stdout) + "\n" + (await stderr)).Trim() };
@@ -383,9 +410,9 @@ namespace PhoneScreen {
             }
             return result.ToString();
         }
-        public Process StartMirror(string endpoint, int profile, bool sound, bool duplicate, bool control, bool keyboard, bool displayOff, string codec, Action<string> output) {
-            if (!serverStarted || disposed) throw new InvalidOperationException("Сначала подключи телефон.");
-            string args = MirrorArguments(endpoint, profile, sound, duplicate, control, keyboard, displayOff, codec);
+        public Process StartMirror(string endpoint, StreamOptions options, Action<string> output) {
+            if (!serverStarted || disposed) throw new InvalidOperationException("Connect the phone first.");
+            string args = MirrorArguments(endpoint, options);
             var process = new Process { StartInfo = StartInfo("scrcpy.exe", args), EnableRaisingEvents = true };
             process.OutputDataReceived += (s, e) => { if (e.Data != null) output(e.Data); };
             process.ErrorDataReceived += (s, e) => { if (e.Data != null) output(e.Data); };
@@ -395,24 +422,37 @@ namespace PhoneScreen {
             process.BeginErrorReadLine();
             return process;
         }
-        public static string MirrorArguments(string endpoint, int profile, bool sound, bool duplicate, bool control, bool keyboard, bool displayOff, string codec) {
+        public static string MirrorArguments(string endpoint, StreamOptions o) {
             var local = Regex.Match(endpoint ?? "", @"^127\.0\.0\.1:(\d{1,5})$");
             int localPort;
             if (!local.Success || !Int32.TryParse(local.Groups[1].Value, out localPort) || localPort < 1024 || localPort > 65535)
-                throw new ArgumentException("Трансляция разрешена только через локальный TLS-мост.");
-            if (profile < 0 || profile > 2 || (codec != "opus" && codec != "aac")) throw new ArgumentException("Неверный профиль.");
-            var args = new StringBuilder("--serial=" + Quote(endpoint) + " --window-title=" + Quote("PhoneScreen — Android") + " --video-codec=h264 --no-clipboard-autosync");
-            if (profile == 0) args.Append(" --max-size=1600 --max-fps=60 --video-bit-rate=8M");
-            if (profile == 1) args.Append(" --max-size=1080 --max-fps=30 --video-bit-rate=4M");
-            if (profile == 2) args.Append(" --max-size=1920 --max-fps=60 --video-bit-rate=12M --video-buffer=120");
-            if (sound) {
-                args.Append(" --require-audio --audio-codec=" + codec + " --audio-bit-rate=192K --audio-buffer=" + (profile == 2 ? "120" : "80"));
-                if (duplicate) args.Append(" --audio-dup");
-                else args.Append(" --audio-source=output");
-            } else args.Append(" --no-audio");
-            if (!control) args.Append(" --no-control");
-            else if (keyboard) args.Append(" --keyboard=uhid");
-            if (displayOff && control) args.Append(" --turn-screen-off");
+                throw new ArgumentException("Screen streaming requires the local TLS bridge.");
+            if (o == null || o.Profile < 0 || o.Profile >= StreamPreferences.ProfileCount || (o.Codec != "opus" && o.Codec != "aac")
+                || o.Audio < AudioMode.Off || o.Audio > AudioMode.Both)
+                throw new ArgumentException("Invalid stream profile.");
+            string title = SavedDevice.CleanModel(o.Title);
+            var args = new StringBuilder("--serial=" + Quote(endpoint) + " --window-title=" + Quote(title.Length == 0 ? "PhoneScreen" : title) + " --video-codec=h264");
+            int audioBuffer;
+            switch (o.Profile) {
+                case 1: args.Append(" --max-size=1280 --max-fps=60 --video-bit-rate=6M"); audioBuffer = 50; break;
+                case 2: args.Append(" --max-size=1024 --max-fps=30 --video-bit-rate=3M"); audioBuffer = 160; break;
+                case 3: args.Append(" --max-size=1920 --max-fps=60 --video-bit-rate=12M --video-buffer=150"); audioBuffer = 150; break;
+                default: args.Append(" --max-size=1600 --max-fps=60 --video-bit-rate=8M"); audioBuffer = 80; break;
+            }
+            if (o.Audio == AudioMode.Off) args.Append(" --no-audio");
+            else {
+                // Wi-Fi jitter needs a bit more buffering than USB, otherwise audio crackles.
+                // Without --require-audio a phone that refuses capture still gets a picture.
+                args.Append(" --audio-codec=" + o.Codec + " --audio-buffer=" + audioBuffer);
+                args.Append(o.Audio == AudioMode.Both ? " --audio-source=playback --audio-dup" : " --audio-source=output");
+            }
+            if (!o.Control) args.Append(" --no-control");
+            else {
+                if (o.Keyboard) args.Append(" --keyboard=uhid");
+                if (o.ScreenOff) args.Append(" --turn-screen-off");
+            }
+            if (!o.Control || !o.Clipboard) args.Append(" --no-clipboard-autosync");
+            if (o.OnTop) args.Append(" --always-on-top");
             return args.ToString();
         }
         public async Task ShutdownAsync() {

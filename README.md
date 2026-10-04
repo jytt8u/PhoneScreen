@@ -1,76 +1,71 @@
-<p align="center"><img src="assets/banner.svg" alt="PhoneScreen — Android на Windows" width="100%"></p>
+<p align="center"><img src="assets/banner.svg" alt="PhoneScreen — your Android, on your desktop" width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/jytt8u/PhoneScreen/releases/latest"><img src="https://img.shields.io/github/v/release/jytt8u/PhoneScreen?color=71dfb8&amp;label=release" alt="Release"></a>
+  <a href="https://github.com/jytt8u/PhoneScreen/releases/latest"><img src="https://img.shields.io/github/v/release/jytt8u/PhoneScreen?color=6ee0b6&amp;label=release" alt="Latest release"></a>
   <a href="https://github.com/jytt8u/PhoneScreen/actions/workflows/build.yml"><img src="https://github.com/jytt8u/PhoneScreen/actions/workflows/build.yml/badge.svg" alt="Windows build"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-24313d" alt="Windows x64">
-  <img src="https://img.shields.io/badge/Android-11%2B-24313d" alt="Android 11+">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-24313d" alt="MIT"></a>
+  <img src="https://img.shields.io/badge/Android-11%2B-24313d" alt="Android 11 and later">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-24313d" alt="MIT license"></a>
 </p>
 
-**Экран Android на компьютере, управление мышью и клавиатурой, звук через колонки ПК — по Wi-Fi.** PhoneScreen настраивает и запускает [scrcpy](https://github.com/Genymobile/scrcpy) через беспроводную отладку Android. Устанавливать приложение на телефон не нужно.
+<p align="center">See and control your Android phone from Windows, with sound, over your own Wi-Fi.<br>No app on the phone, no account, no cloud.</p>
 
-<p align="center"><a href="https://github.com/jytt8u/PhoneScreen/releases/latest/download/PhoneScreen-1.0.0-win64.zip"><strong>↓ Скачать готовую версию для Windows</strong></a> · <a href="Инструкция.md">Инструкция</a> · <a href="SECURITY.md">Безопасность</a></p>
+<p align="center"><a href="https://github.com/jytt8u/PhoneScreen/releases/latest/download/PhoneScreen-1.1.0-win64.zip"><img src="assets/download.svg" alt="Download PhoneScreen for Windows" width="282"></a></p>
+<p align="center"><a href="GUIDE.md">Guide</a> · <a href="https://github.com/jytt8u/PhoneScreen/releases/latest">All downloads</a> · <a href="SECURITY.md">Security</a></p>
 
-<p align="center"><img src="assets/screenshot.png" alt="Окно PhoneScreen: сопряжение, подключение, качество и звук" width="840"></p>
+<p align="center"><img src="assets/screenshot.png" alt="PhoneScreen window: a phone found on the network, the Connect button and QR pairing" width="900"></p>
 
-## Начать за пару минут
+PhoneScreen is a small Windows app built around [scrcpy](https://github.com/Genymobile/scrcpy). It opens your phone's screen in a window on the PC: click to tap, drag to swipe, scroll with the wheel, type on your real keyboard, and hear the phone through your PC speakers or headphones.
 
-1. Скачай ZIP по ссылке выше, распакуй в обычную папку и открой **PhoneScreen.exe**. В готовом архиве scrcpy уже установлен.
-2. На телефоне включи параметры разработчика и **«Беспроводную отладку»**. Телефон и компьютер должны быть в одной сети; ПК можно подключить к роутеру кабелем.
-3. Открой **«Сопряжение с помощью кода»**. В PhoneScreen введи адрес, порт и шестизначный код из этого окна. Нажми **«Сопрячь телефон»**.
-4. Вернись на основной экран беспроводной отладки. Введи его **адрес и порт подключения**, затем нажми **«Показать экран»**. Порт подключения отличается от порта сопряжения.
+Download the ZIP, extract it, run **PhoneScreen.exe**. scrcpy is already inside.
 
-В следующий раз сопрягать телефон обычно не требуется. Включи беспроводную отладку и проверь адрес: Android может менять порт после перезапуска.
+## Getting connected
 
-Предпочитаешь небольшой файл? В [релизе](https://github.com/jytt8u/PhoneScreen/releases/latest) есть отдельный `PhoneScreen.exe`. Нажми **«Установить scrcpy»** — программа сама скачает и проверит официальный архив. Уже скачанный ZIP можно выбрать кнопкой **«У меня есть ZIP»**.
+1. On the phone, turn on **Wireless debugging** (Settings → Developer options). Phone and PC need to be on the same network.
+2. The first time, tap **Pair device with QR code** on the phone and scan the code PhoneScreen shows. It pairs and connects by itself.
+3. Next time just open PhoneScreen and press **Connect**. The phone is found on the network automatically, even after Android changes its port.
 
-## Что умеет
+No camera? Use **Pair device with pairing code** instead; the address fills in for you, you only type the six digits. Typing an address by hand still works too. The [guide](GUIDE.md) has the details and fixes for common problems.
 
-| Возможность | Как работает |
+## What it does
+
+| | |
 | :--- | :--- |
-| Экран и управление | Отдельное окно Android, клики, свайпы, прокрутка и клавиатура |
-| Звук | Opus или AAC, вывод на ПК; одновременный звук на телефоне — Android 13+ |
-| Качество | Профили «Баланс», «Слабый Wi-Fi» и «Видео» |
-| Подключение | Сопряжение по коду, защищённый транспорт ADB, без USB и root |
-| Быстрый запуск | Готовый переносимый архив, без установки SDK, службы и учётной записи |
-| Ручная установка | Официальный ZIP scrcpy 4.1 с проверкой SHA-256 |
+| **Finds your phone** | Uses the same network discovery as Android Studio. When several phones are around, pick one from a list. |
+| **QR pairing** | Scan once and you're done. No IP addresses or ports to copy. |
+| **Sound** | Opus or AAC, on the PC only or on both devices (Android 13+). If the phone can't encode Opus, PhoneScreen switches to AAC and restarts the stream on its own. |
+| **Stays connected** | Notices a dropped Wi-Fi link within a few seconds and reconnects automatically. |
+| **Four profiles** | Balanced, Responsive (lowest delay), Weak Wi-Fi and Movies (buffered for smooth audio/video sync). |
+| **Input** | Mouse and a hardware keyboard that respects your phone's layout, or view-only. Optional clipboard sharing. |
+| **Fits in** | Dark interface with a dark title bar, follows Windows display scaling, remembers your phone and settings. |
 
-Нужны **Windows 10/11 x64, .NET Framework 4.8 и Android 11+**. На Android 11 перед запуском разблокируй экран для передачи звука. Некоторые приложения запрещают захват аудио или изображения. Микрофон и звук звонков не входят в обычную трансляцию.
+<details>
+<summary>Stream settings</summary>
+<p><img src="assets/settings.png" alt="Picture, sound and codec pickers plus switches for control, keyboard, screen off, clipboard and always on top" width="900"></p>
+</details>
 
-## Защита подключения
+**You need** Windows 10 or 11 (x64, .NET Framework 4.8 is built in) and Android 11 or newer. No root and no USB cable.
 
-PhoneScreen проверяет переход на TLS **в том же соединении, по которому передаются данные**. Старый незашифрованный режим ADB отклоняется. Локальный мост и отдельный сервер ADB слушают только loopback; автоматический поиск и подключение к устройствам отключены.
+## Privacy and security
 
-Загрузчик принимает только HTTPS-ссылки разрешённых серверов GitHub и сверяет заранее закреплённый SHA-256. Перед запуском программа проверяет каждый файл scrcpy по встроенному списку хешей и удерживает файлы от изменения на время работы. Код сопряжения не сохраняется, запись экрана и звука не ведётся, автоматическая синхронизация буфера обмена выключена.
+Everything stays on your network. PhoneScreen only talks to private IP addresses, and it refuses to connect unless the phone's port switches to TLS first, so the old unencrypted ADB on port 5555 is never used. Its own ADB server listens on the loopback interface only and is stopped when you close the app.
 
-Сопряжение даёт компьютеру доступ через ADB, шире обычного просмотра экрана. Используй свой ПК и доверенную сеть. **Ключи ADB находятся в стандартной папке пользователя Windows `.android` и могут использоваться другими Android-инструментами.** Кнопка «Отключить» завершает сеанс; полный отзыв доступа выполняется на телефоне удалением ПК из списка сопряжённых устройств.
+The scrcpy runtime is pinned to an exact SHA-256, checked file by file before every start, and locked while it runs. Pairing codes are never written to disk. Clipboard sharing is off unless you turn it on. Nothing is recorded.
 
-Подробности проверок и ограничения описаны в [SECURITY.md](SECURITY.md).
+Pairing gives the PC full ADB access to the phone, which is more than screen mirroring needs. Turn off Wireless debugging when you're finished, and remove the PC under *Paired devices* if you no longer use it. More in [SECURITY.md](SECURITY.md).
 
-## Собрать из исходников
+## Building from source
 
-На Windows с .NET Framework 4.8, в PowerShell:
+On Windows, in PowerShell:
 
 ```powershell
 .\build.ps1
-.\PhoneScreen.Tests.exe
-```
-
-SDK .NET, NuGet и сторонние библиотеки для сборки оболочки не нужны. Для проверки установленного движка и реального сервера ADB:
-
-```powershell
 .\PhoneScreen.Tests.exe --runtime .
+.\PhoneScreen.UiChecks.exe
 ```
 
-Отдельная проверка загрузчика с выходом в сеть:
+The compiler that ships with .NET Framework is all you need: no SDK, no NuGet packages. `pack.ps1` builds the portable ZIP. GitHub Actions runs the same build and tests on every push.
 
-```powershell
-.\PhoneScreen.Tests.exe --download
-```
+## Credits
 
-На момент выпуска прошли **66 проверок**, включая обмен по TLS-мосту, блокировку незашифрованного ADB, проверку файлов и запуск настоящего ADB на loopback. Проверка загрузки и установки также прошла. Трансляция на физическом телефоне пока не проверена. GitHub Actions собирает приложение и запускает автономные проверки при каждом изменении.
-
-## Лицензии
-
-Оболочка PhoneScreen — [MIT](LICENSE). scrcpy, ADB и медиабиблиотеки сохраняют свои лицензии; описание и ссылки на исходники — [THIRD_PARTY.md](THIRD_PARTY.md). PhoneScreen — самостоятельная оболочка, не официальный продукт Genymobile.
+PhoneScreen is MIT licensed. The real work is done by scrcpy, made by Romain Vimont and Genymobile, which keeps its own Apache 2.0 license; see [THIRD_PARTY.md](THIRD_PARTY.md) for it and the other bundled components. PhoneScreen is an independent project and is not affiliated with Genymobile.

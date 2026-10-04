@@ -24,6 +24,11 @@ jobs:
         run: |
           .\PhoneScreen.Tests.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Interface checks
+        shell: powershell
+        run: |
+          .\PhoneScreen.UiChecks.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload launcher
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -31,7 +36,7 @@ jobs:
           path: |
             PhoneScreen.exe
             README.md
-            Инструкция.md
+            GUIDE.md
             LICENSE
             SECURITY.md
           if-no-files-found: error

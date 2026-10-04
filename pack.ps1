@@ -1,8 +1,9 @@
 ﻿$ErrorActionPreference = 'Stop'
 $appRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $appRoot 'dist'
-$archivePath = Join-Path $releaseDirectory 'PhoneScreen-1.0.0-win64.zip'
+$archivePath = Join-Path $releaseDirectory 'PhoneScreen-1.1.0-win64.zip'
 $stageDirectory = Join-Path $releaseDirectory ('package-' + [Guid]::NewGuid().ToString('N'))
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [void][System.Reflection.Assembly]::LoadFile((Join-Path $appRoot 'PhoneScreen.exe'))
 [PhoneScreen.FileSafety]::CheckPath($releaseDirectory)
@@ -10,7 +11,7 @@ New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 $runtimeLease = [PhoneScreen.Package]::AcquireRuntime($appRoot)
 try {
     New-Item -ItemType Directory -Path $stageDirectory | Out-Null
-    foreach ($file in @('PhoneScreen.exe', 'README.md', 'Инструкция.md', 'LICENSE', 'SECURITY.md', 'THIRD_PARTY.md', 'CHANGELOG.md')) {
+    foreach ($file in @('PhoneScreen.exe', 'README.md', 'GUIDE.md', 'LICENSE', 'SECURITY.md', 'THIRD_PARTY.md', 'CHANGELOG.md')) {
         Copy-Item -LiteralPath (Join-Path $appRoot $file) -Destination $stageDirectory
     }
     Copy-Item -LiteralPath (Join-Path $appRoot 'assets') -Destination $stageDirectory -Recurse
@@ -23,7 +24,14 @@ try {
         Copy-Item -LiteralPath (Join-Path (Join-Path $appRoot 'tools\scrcpy') $entry) -Destination $destination
     }
     if (Test-Path -LiteralPath $archivePath) { [PhoneScreen.FileSafety]::DeleteChild($releaseDirectory, $archivePath) }
-    [System.IO.Compression.ZipFile]::CreateFromDirectory($stageDirectory, $archivePath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    # Windows PowerShell writes backslashes into entry names; use forward slashes so every unzip tool agrees.
+    $archive = [System.IO.Compression.ZipFile]::Open($archivePath, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($file in Get-ChildItem -LiteralPath $stageDirectory -Recurse -File) {
+            $entry = $file.FullName.Substring($stageDirectory.Length + 1).Replace([char]92, [char]47)
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $entry, [System.IO.Compression.CompressionLevel]::Optimal)
+        }
+    } finally { $archive.Dispose() }
 } finally {
     $runtimeLease.Dispose()
     [PhoneScreen.FileSafety]::DeleteChild($releaseDirectory, $stageDirectory)

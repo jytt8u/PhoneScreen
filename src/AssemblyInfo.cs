@@ -5,6 +5,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescription("Android screen, control and audio on Windows over Wi-Fi")]
 [assembly: AssemblyProduct("PhoneScreen")]
 [assembly: AssemblyCopyright("Copyright © 2026 PhoneScreen contributors")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 [assembly: ComVisible(false)]
