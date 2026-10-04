@@ -1,0 +1,10 @@
+.data/
+tools/
+downloads/
+*.exe
+preview.png
+*.zip
+dist/
+.android/
+*.part
+*.error.txt
