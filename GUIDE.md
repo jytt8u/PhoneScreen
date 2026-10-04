@@ -6,7 +6,7 @@ You need Windows 10 or 11 (x64) and Android 11 or newer, both on the same networ
 
 ## First time
 
-**1. Get PhoneScreen.** Download the ZIP from [Releases](https://github.com/jytt8u/PhoneScreen/releases/latest), extract it somewhere you can write to (Desktop or Documents is fine, Program Files is not) and run `PhoneScreen.exe`. If you only downloaded the EXE, click **Install engine** and it fetches scrcpy for you.
+**1. Get PhoneScreen.** Download the ZIP from [Releases](https://github.com/jytt8u/PhoneScreen/releases/latest), extract it somewhere you can write to (Desktop or Documents is fine, Program Files is not) and run `PhoneScreen.exe`. If you only downloaded the EXE, click **Install engine** and it fetches scrcpy for you. To check the download first or build it from source, see the [README](README.md#check-your-download).
 
 **2. Turn on Wireless debugging.** If you've never used Developer options: Settings → About phone → tap *Build number* seven times. Then go to Settings → System → Developer options (the location varies by brand) and turn on **Wireless debugging**. Accept the prompt about the network.
 

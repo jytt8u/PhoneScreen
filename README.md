@@ -17,7 +17,7 @@
 
 PhoneScreen is a small Windows app built around [scrcpy](https://github.com/Genymobile/scrcpy). It opens your phone's screen in a window on the PC: click to tap, drag to swipe, scroll with the wheel, type on your real keyboard, and hear the phone through your PC speakers or headphones.
 
-Download the ZIP, extract it, run **PhoneScreen.exe**. scrcpy is already inside.
+Download the ZIP, extract it, run **PhoneScreen.exe**. scrcpy is already inside. Not sure about running a ZIP from GitHub? See [Check your download](#check-your-download) or build it yourself in three commands.
 
 ## Getting connected
 
@@ -54,17 +54,37 @@ The scrcpy runtime is pinned to an exact SHA-256, checked file by file before ev
 
 Pairing gives the PC full ADB access to the phone, which is more than screen mirroring needs. Turn off Wireless debugging when you're finished, and remove the PC under *Paired devices* if you no longer use it. More in [SECURITY.md](SECURITY.md).
 
-## Building from source
+## Check your download
 
-On Windows, in PowerShell:
+Release files aren’t built on anyone’s PC. GitHub Actions builds them from the tagged source in this repository ([release.yml](.github/workflows/release.yml)), downloads scrcpy from its official release, checks every SHA-256 and signs a [build provenance attestation](https://github.com/jytt8u/PhoneScreen/attestations). With the [GitHub CLI](https://cli.github.com/) you can confirm that a file you downloaded came out of that build:
 
 ```powershell
-.\build.ps1
-.\PhoneScreen.Tests.exe --runtime .
-.\PhoneScreen.UiChecks.exe
+gh attestation verify PhoneScreen-1.1.0-win64.zip -R jytt8u/PhoneScreen
 ```
 
-The compiler that ships with .NET Framework is all you need: no SDK, no NuGet packages. `pack.ps1` builds the portable ZIP. GitHub Actions runs the same build and tests on every push.
+The same works for `PhoneScreen.exe`. If the file was changed in any way, verification fails.
+
+The bundled scrcpy is the unmodified official build. Its SHA-256, `5b12172b3264b2889f4583ee64752ce832e29bc8b1089dca81093459697165db`, is pinned in [Core.cs](src/Core.cs) and can be compared with the one published on the [scrcpy 4.1 release page](https://github.com/Genymobile/scrcpy/releases/tag/v4.1).
+
+## Building from source
+
+If you’d rather not run a downloaded EXE at all, build it yourself. The C# compiler that ships with Windows is enough; no SDK or NuGet packages. In PowerShell:
+
+```powershell
+git clone https://github.com/jytt8u/PhoneScreen.git
+cd PhoneScreen
+.\build.ps1
+```
+
+Then run `PhoneScreen.exe` and click **Install engine**, or run `.\fetch-runtime.ps1`. Both download scrcpy straight from Genymobile’s GitHub and refuse it if the SHA-256 doesn’t match. The app logic lives in `src/`, mostly [Core.cs](src/Core.cs) and [Main.cs](src/Main.cs), if you want to read it first.
+
+To run the tests and build the portable ZIP:
+
+```powershell
+.\PhoneScreen.Tests.exe --runtime .
+.\PhoneScreen.UiChecks.exe
+.\pack.ps1
+```
 
 ## Credits
 

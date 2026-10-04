@@ -28,7 +28,7 @@ Fixes go into the latest release. PhoneScreen 1.1 pins the official scrcpy 4.1 W
 - ADB's key lives in `%USERPROFILE%\.android` and is shared with other Android tools. PhoneScreen doesn't isolate it.
 - While a phone is connected, any program running on the same PC can talk to the local ADB server, as with any ADB setup. The random port makes this harder to stumble on, but it is not an access control.
 - A compromised Windows account, administrator, phone or router is outside what PhoneScreen can protect against.
-- `PhoneScreen.exe` is not code-signed, so SmartScreen may warn on first launch. Release checksums are in `SHA256SUMS.txt`.
+- `PhoneScreen.exe` is not code-signed, so SmartScreen may warn on first launch. Releases are built by GitHub Actions from the tagged source and carry a signed provenance attestation; check one with `gh attestation verify <file> -R jytt8u/PhoneScreen`. Checksums are in `SHA256SUMS.txt`.
 - Apps can block screen or sound capture, and wireless latency depends on the phone and the network.
 
 ## Reporting a problem

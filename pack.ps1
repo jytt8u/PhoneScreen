@@ -1,7 +1,8 @@
 ﻿$ErrorActionPreference = 'Stop'
 $appRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $appRoot 'dist'
-$archivePath = Join-Path $releaseDirectory 'PhoneScreen-1.1.0-win64.zip'
+$version = (Get-Item -LiteralPath (Join-Path $appRoot 'PhoneScreen.exe')).VersionInfo.ProductVersion -replace '\.0$', ''
+$archivePath = Join-Path $releaseDirectory "PhoneScreen-$version-win64.zip"
 $stageDirectory = Join-Path $releaseDirectory ('package-' + [Guid]::NewGuid().ToString('N'))
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem

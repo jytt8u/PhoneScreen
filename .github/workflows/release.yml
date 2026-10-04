@@ -1,0 +1,65 @@
+name: Release
+
+# Builds the release on GitHub's runners from the tagged source and signs a
+# provenance attestation, so anyone can check that a download came from this code.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to rebuild, e.g. v1.1.0
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.TAG }}
+      - name: Build
+        shell: powershell
+        run: .\build.ps1
+      - name: Check the tag matches the app version
+        shell: powershell
+        run: |
+          $version = (Get-Item .\PhoneScreen.exe).VersionInfo.ProductVersion -replace '\.0$', ''
+          if ("v$version" -ne $env:TAG) { throw "Tag $env:TAG does not match app version $version." }
+      - name: Fetch the official runtime
+        shell: powershell
+        run: .\fetch-runtime.ps1
+      - name: Tests
+        shell: powershell
+        run: |
+          .\PhoneScreen.Tests.exe --runtime .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\PhoneScreen.UiChecks.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package
+        shell: powershell
+        run: .\pack.ps1
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/PhoneScreen-*-win64.zip
+            PhoneScreen.exe
+      - name: Publish
+        shell: powershell
+        run: |
+          $files = @((Get-Item dist\PhoneScreen-*-win64.zip).FullName, 'PhoneScreen.exe', 'dist\SHA256SUMS.txt', 'downloads\ffmpeg-8.1.2.tar.xz', 'downloads\libusb-1.0.30.tar.bz2')
+          cmd /c "gh release view %TAG% >nul 2>&1"
+          if ($LASTEXITCODE -eq 0) { gh release upload $env:TAG @files --clobber }
+          else { gh release create $env:TAG @files --title "PhoneScreen $($env:TAG.TrimStart('v'))" --notes-file release-notes.md --verify-tag }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
