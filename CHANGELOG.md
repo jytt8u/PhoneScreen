@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.1 — 2026-10-05
+
+Fixes for phones that wouldn’t connect. Tested with a Samsung Galaxy A51 on Android 13.
+
+- Samsung phones leave `service.adb.tls.port` empty, and PhoneScreen refused to connect because of it. TLS is now checked on the connection itself, which was already the real safeguard.
+- Phone search uses adb’s own mDNS backend. The Openscreen backend that 1.1.0 forced didn’t see phones on some networks.
+- If the saved address doesn’t answer (the phone got a new IP or port), PhoneScreen searches again and connects to the new address by itself.
+- Phone search restarts when nothing is found for a while, so a phone that turns on Wireless debugging later still shows up.
+- Clear messages for “Wireless debugging is off”, “not on the same Wi-Fi” and “this PC isn’t paired any more”, detected right away instead of after a 15-second wait.
+- Fixed a “pipe closed” error when adb exited before reading its input.
+
 ## 1.1.0 — 2026-10-04
 
 ### Connecting

@@ -10,7 +10,7 @@
 
 <p align="center">See and control your Android phone from Windows, with sound, over your own Wi-Fi.<br>No app on the phone, no account, no cloud.</p>
 
-<p align="center"><a href="https://github.com/jytt8u/PhoneScreen/releases/latest/download/PhoneScreen-1.1.0-win64.zip"><img src="assets/download.svg" alt="Download PhoneScreen for Windows" width="282"></a></p>
+<p align="center"><a href="https://github.com/jytt8u/PhoneScreen/releases/latest/download/PhoneScreen-1.1.1-win64.zip"><img src="assets/download.svg" alt="Download PhoneScreen for Windows" width="282"></a></p>
 <p align="center"><a href="GUIDE.md">Guide</a> · <a href="https://github.com/jytt8u/PhoneScreen/releases/latest">All downloads</a> · <a href="SECURITY.md">Security</a></p>
 
 <p align="center"><img src="assets/screenshot.png" alt="PhoneScreen window: a phone found on the network, the Connect button and QR pairing" width="900"></p>
@@ -59,7 +59,7 @@ Pairing gives the PC full ADB access to the phone, which is more than screen mir
 Release files aren’t built on anyone’s PC. GitHub Actions builds them from the tagged source in this repository ([release.yml](.github/workflows/release.yml)), downloads scrcpy from its official release, checks every SHA-256 and signs a [build provenance attestation](https://github.com/jytt8u/PhoneScreen/attestations). With the [GitHub CLI](https://cli.github.com/) you can confirm that a file you downloaded came out of that build:
 
 ```powershell
-gh attestation verify PhoneScreen-1.1.0-win64.zip -R jytt8u/PhoneScreen
+gh attestation verify PhoneScreen-1.1.1-win64.zip -R jytt8u/PhoneScreen
 ```
 
 The same works for `PhoneScreen.exe`. If the file was changed in any way, verification fails.

@@ -77,6 +77,19 @@ static class Tests {
             }
         } finally { phone.Stop(); }
     }
+    // A closed phone port must surface as "connection refused", not as a generic pairing failure.
+    static async Task TestRefusedBridge() {
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start(); int closed = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+        using (var bridge = new TlsBridge(new PhoneAddress { IP = IPAddress.Loopback, Port = closed }))
+        using (var host = new TcpClient()) {
+            await host.ConnectAsync(IPAddress.Loopback, Int32.Parse(bridge.Serial.Split(':')[1]));
+            byte[] cnxn = TlsProbe.ConnectPacket(); host.GetStream().Write(cnxn, 0, cnxn.Length);
+            Check(await Task.WhenAny(bridge.Completion, Task.Delay(8000)) == bridge.Completion, "bridge gives up on a closed phone port");
+            var socket = bridge.Failure as SocketException;
+            Check(socket != null && socket.SocketErrorCode == SocketError.ConnectionRefused && !bridge.Secured, "bridge reports a refused port as the cause");
+        }
+    }
     static async Task EngineCheck(string root) {
         using (var engine = new Engine(root)) {
             Exception failure = null;
@@ -219,10 +232,12 @@ static class Tests {
                     Check(!info.UseShellExecute && info.CreateNoWindow, "no shell or console used for commands");
                     Check(info.EnvironmentVariables["ADB_SERVER_SOCKET"] == "tcp:0", "ADB server uses local-only socket spec");
                     Check(info.EnvironmentVariables["ADB_MDNS_AUTO_CONNECT"] == "0", "unrequested auto-connections disabled");
+                    Check(info.EnvironmentVariables["ADB_MDNS_OPENSCREEN"] == null, "adb's own mDNS backend is used for phone discovery");
                     Check(info.EnvironmentVariables["ADB_VENDOR_KEYS"] == null, "inherited vendor key override removed");
                     Check(info.EnvironmentVariables["SCRCPY_SERVER_PATH"] == null, "inherited scrcpy server override removed");
                 }
             } finally { FileSafety.DeleteChild(Path.GetTempPath(), scratch); }
+            TestRefusedBridge().GetAwaiter().GetResult();
             TestBridge(false).GetAwaiter().GetResult();
             TestBridge(true).GetAwaiter().GetResult();
             if (cli.Length == 2 && cli[0] == "--runtime") {

@@ -1,23 +1,20 @@
-See and control your Android phone from Windows, with sound, over Wi-Fi.
+Fixes for phones that wouldn't connect. If 1.1.0 kept saying it couldn't find or connect to your phone, this is the update.
 
-Download **PhoneScreen-1.1.0-win64.zip**, extract it and run **PhoneScreen.exe**. scrcpy is included. Requires Windows 10/11 x64 and Android 11 or newer.
+Download **PhoneScreen-1.1.1-win64.zip**, extract it and run **PhoneScreen.exe**. scrcpy is included. Requires Windows 10/11 x64 and Android 11 or newer.
 
-### What's new
+### Fixed
 
-- **Finds your phone by itself.** Turn on Wireless debugging and press Connect. No IP addresses or ports to copy, even after Android changes the port.
-- **QR pairing.** Scan the code once and the phone screen opens.
-- **More reliable sound.** The picture keeps going if audio capture fails, phones without Opus switch to AAC automatically, and the buffers are tuned for Wi-Fi.
-- **Stays connected.** Dropped Wi-Fi is detected within seconds and the stream reconnects.
-- **New look.** Dark interface with a dark title bar, four stream profiles, clipboard sharing and always-on-top options, correct scaling on high-DPI screens.
-
-`PhoneScreen.exe` on its own can download scrcpy with one click. The FFmpeg and libusb archives are the source code for the bundled libraries and aren't needed to run the app. `SHA256SUMS.txt` lists checksums for every file.
+- **Samsung phones connect again.** One UI doesn't publish the ADB TLS port property, and PhoneScreen used to stop there. Encryption is still enforced on the connection itself.
+- **Your phone shows up in the list.** Phone search now uses adb's own mDNS backend, which finds phones on networks where the previous one didn't.
+- **New address? No problem.** When the phone gets a new IP or port, PhoneScreen notices, searches again and connects to the new one.
+- **Better messages.** "Wireless debugging is off", "not on the same Wi-Fi" and "pair again" are told apart, immediately.
 
 ### Check your download
 
-These files were built by GitHub Actions from the `v1.1.0` source, not on a personal PC. To confirm, install the [GitHub CLI](https://cli.github.com/) and run:
+These files were built by GitHub Actions from the `v1.1.1` source, not on a personal PC. To confirm, install the [GitHub CLI](https://cli.github.com/) and run:
 
 ```
-gh attestation verify PhoneScreen-1.1.0-win64.zip -R jytt8u/PhoneScreen
+gh attestation verify PhoneScreen-1.1.1-win64.zip -R jytt8u/PhoneScreen
 ```
 
 Or skip the download entirely and [build it from source](https://github.com/jytt8u/PhoneScreen#building-from-source).

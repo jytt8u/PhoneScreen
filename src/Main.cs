@@ -145,7 +145,7 @@ namespace PhoneScreen {
 
         string chosenName, autoAddress;
         bool discoveryFailed, discoveryStarted, settingAddress;
-        DateTime discoveryStart = DateTime.UtcNow;
+        DateTime discoveryStart = DateTime.UtcNow, serverSince = DateTime.UtcNow;
         PairingTicket ticket;
         PhoneService pendingQr;
         string attemptedTicket;
@@ -721,11 +721,19 @@ namespace PhoneScreen {
                 if (discoveryFailed) AddLog("Phone search is working again.");
                 discoveryFailed = false; discoveryStarted = true;
                 ApplyServices(found);
+                // A long-running ADB server can miss a phone that turned on Wireless debugging later.
+                // Restarting it makes it ask the network again.
+                bool waitingForScan = pairingExpanded && ticket != null && !found.Any(s => s.Pairing && s.Name == ticket.Name);
+                if ((!found.Any(s => !s.Pairing) || waitingForScan) && (DateTime.UtcNow - serverSince).TotalSeconds > 12 && !busy && mirror == null) await RestartSearchAsync();
             } catch (Exception ex) {
                 if (closing) return;
                 if (!discoveryFailed) AddLog("Phone search unavailable: " + Friendly(ex));
                 discoveryFailed = true; services = new List<PhoneService>(); UpdateControls();
             }
+        }
+        async Task RestartSearchAsync() {
+            serverSince = DateTime.UtcNow;
+            try { await engine.ShutdownAsync(); } catch (Exception ex) { AddLog("Restarting phone search: " + Friendly(ex)); }
         }
         async Task RefreshServices() {
             try { ApplyServices(await engine.ServicesAsync()); } catch (Exception ex) { AddLog("Phone search: " + Friendly(ex)); }
@@ -820,20 +828,28 @@ namespace PhoneScreen {
             }
             var endpoint = PhoneAddress.Parse(connectAddress.Text);
             string address = endpoint.ToString();
-            var target = services.FirstOrDefault(s => !s.Pairing && s.Address.ToString() == address);
             SetStatus("Connecting to " + address, "Unlock the phone. If it asks, allow the connection.", Tone.Neutral);
+            endpoint = await ReachableAsync(endpoint);
+            address = endpoint.ToString();
+            var target = services.FirstOrDefault(s => !s.Pairing && s.Address.ToString() == address);
             await engine.InitializeAsync();
             bridge = new TlsBridge(endpoint);
             serial = bridge.Serial;
             var connection = await engine.AdbAsync("connect " + Engine.Quote(serial), null, 18000);
             if (connection.ExitCode != 0 || connection.Output.IndexOf("connected to", StringComparison.OrdinalIgnoreCase) < 0)
-                throw new IOException(bridge.Error ?? "The phone didn't answer. Check that Wireless debugging is on and the port is current.");
-            try {
-                var wait = await engine.AdbAsync("-s " + Engine.Quote(serial) + " wait-for-device", null, 15000);
-                if (wait.ExitCode != 0) throw new TimeoutException();
-            } catch (TimeoutException) {
-                throw new IOException(bridge.Error ?? "The phone didn't accept this PC. Pair it again (removing a paired PC on the phone also requires re-pairing).");
+                throw new IOException(BridgeProblem(bridge) ?? "The phone didn't answer. Check that Wireless debugging is on and the port is current.");
+            // adb says "connected" as soon as the local socket opens. The real answer comes from the phone:
+            // either ADB reaches the "device" state, or the bridge closes because the phone hung up.
+            var wait = engine.AdbAsync("-s " + Engine.Quote(serial) + " wait-for-device", null, 15000);
+            var first = await Task.WhenAny(wait, bridge.Completion);
+            if (first == bridge.Completion) {
+                var ignored = wait.ContinueWith(t => t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+                throw new IOException(BridgeProblem(bridge) ?? "The phone closed the connection.");
             }
+            CommandResult waited = null;
+            try { waited = await wait; } catch (TimeoutException) { }
+            if (waited == null || waited.ExitCode != 0)
+                throw new IOException(BridgeProblem(bridge) ?? "The phone didn't accept this PC. Unlock it; if it still fails, pair again.");
             AddLog("TLS confirmed on the connection. ADB authenticated the phone.");
             var props = await engine.AdbAsync("-s " + Engine.Quote(serial) + " shell "
                 + Engine.Quote("getprop ro.build.version.sdk;getprop service.adb.tls.port;getprop ro.product.marketname;getprop ro.product.manufacturer;getprop ro.product.model"), null, 8000);
@@ -842,8 +858,11 @@ namespace PhoneScreen {
             if (props.ExitCode != 0 || lines.Length < 5 || !Int32.TryParse(lines[0].Trim(), out sdk))
                 throw new IOException("Couldn't read the Android version. Unlock the phone and try again.");
             if (sdk < 30) throw new IOException("Wireless debugging with sound needs Android 11 or newer.");
-            if (!Int32.TryParse(lines[1].Trim(), out reportedPort) || reportedPort != endpoint.Port)
-                throw new IOException("The phone didn't confirm this port. Use the address on the main Wireless debugging screen.");
+            // TLS is proven on this very socket by the bridge. The port property is only a hint:
+            // Samsung and some other phones leave service.adb.tls.port empty.
+            if (!bridge.Secured) throw new IOException("The connection to the phone isn't encrypted. Stopped for safety.");
+            if (Int32.TryParse(lines[1].Trim(), out reportedPort) && reportedPort != endpoint.Port)
+                AddLog("The phone reports TLS port " + reportedPort + ", connected on " + endpoint.Port + ".");
             string market = SavedDevice.CleanModel(lines[2]), maker = SavedDevice.CleanModel(lines[3]), model = SavedDevice.CleanModel(lines[4]);
             if (market.Length == 0) market = model.StartsWith(maker, StringComparison.OrdinalIgnoreCase) || maker.Length == 0 ? model
                 : SavedDevice.CleanModel(Char.ToUpperInvariant(maker[0]) + maker.Substring(1) + " " + model);
@@ -872,6 +891,40 @@ namespace PhoneScreen {
             TrySavePreferences();
             SetStatus("Opening the phone screen", "It appears in its own window in a moment.", Tone.Neutral);
             AddLog("Android " + AndroidVersion(sdk) + " (API " + sdk + "), " + (market.Length > 0 ? market : "unknown model") + ". Starting the stream.");
+        }
+
+        static string BridgeProblem(TlsBridge bridge) {
+            if (bridge.Failure != null) return Friendly(bridge.Failure);
+            if (bridge.Completion.IsCompleted && bridge.Secured)
+                return "The phone ended the encrypted connection. This PC probably isn't paired with it any more (or was removed under Paired devices). Pair it again with the QR code.";
+            return null;
+        }
+
+        static async Task<Exception> ProbeAsync(PhoneAddress endpoint) {
+            try { await TlsProbe.CheckAsync(endpoint.IP, endpoint.Port, 4000); return null; } catch (Exception ex) { return ex; }
+        }
+
+        // Android hands out a new port (and sometimes a new IP) whenever Wireless debugging restarts.
+        // If the address doesn't answer, search the network again before giving up.
+        async Task<PhoneAddress> ReachableAsync(PhoneAddress endpoint) {
+            var problem = await ProbeAsync(endpoint);
+            if (problem == null) return endpoint;
+            AddLog(endpoint + " didn't answer: " + Friendly(problem));
+            SetStatus("Looking for the phone again", "Its address didn't answer. Searching your network for the new one…", Tone.Neutral);
+            await RestartSearchAsync();
+            for (int attempt = 0; attempt < 8 && !closing; attempt++) {
+                await Task.Delay(1000);
+                await RefreshServices();
+                var connects = services.Where(s => !s.Pairing).ToList();
+                var found = connects.FirstOrDefault(s => s.Name == saved.Service || s.Name == chosenName || s.Address.IP.Equals(endpoint.IP))
+                    ?? (connects.Count == 1 ? connects[0] : null);
+                if (found == null || found.Address.ToString() == endpoint.ToString()) continue;
+                if (await ProbeAsync(found.Address) != null) continue;
+                AddLog("The phone moved to " + found.Address + ".");
+                chosenName = found.Name; FillAddress(found);
+                return found.Address;
+            }
+            throw new IOException(Friendly(problem));
         }
 
         void OnMirrorOutput(string line, StreamOptions options, int sdk) {
@@ -954,9 +1007,11 @@ namespace PhoneScreen {
 
         static string Friendly(Exception ex) {
             var socket = ex as System.Net.Sockets.SocketException;
-            if (socket != null) return "Can't reach the phone (" + socket.SocketErrorCode + "). Check Wi-Fi, the address and Wireless debugging.";
+            if (socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionRefused)
+                return "The phone refused the connection. Wireless debugging is off or Android gave it a new port: open Settings → Developer options → Wireless debugging, turn it on and check the IP address & port.";
+            if (socket != null) return "The phone doesn't answer (" + socket.SocketErrorCode + "). Check that it's on the same Wi-Fi as this PC and Wireless debugging is on.";
+            if (ex is TimeoutException) return "The phone doesn't answer. Check that it's on the same Wi-Fi as this PC and Wireless debugging is on.";
             if (ex is OperationCanceledException) return "Cancelled or timed out.";
-            if (ex is TimeoutException) return ex.Message;
             return ex.Message;
         }
         static string FailureHint(string output) {

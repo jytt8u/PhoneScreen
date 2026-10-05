@@ -122,7 +122,7 @@ namespace PhoneScreen {
                 using (var handler = new HttpClientHandler { AllowAutoRedirect = false })
                 using (var client = new HttpClient(handler)) {
                     timeout.CancelAfter(180000);
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("PhoneScreen/1.1");
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("PhoneScreen/1.1.1");
                     Uri uri = new Uri(Download);
                     for (int redirect = 0; redirect < 6; redirect++) {
                         if (!AllowedDownloadUri(uri)) throw new IOException("Unsupported download address rejected.");

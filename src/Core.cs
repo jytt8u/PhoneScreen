@@ -98,7 +98,13 @@ namespace PhoneScreen {
         TcpClient host, phone;
         volatile bool disposed;
         volatile string error;
+        volatile Exception failure;
+        volatile bool secured;
         public string Error { get { return error; } }
+        // The exception that stopped the bridge before or during the TLS switch.
+        public Exception Failure { get { return failure; } }
+        // True once both sides agreed to TLS; a close after that is ADB authentication failing.
+        public bool Secured { get { return secured; } }
         public string Serial { get; private set; }
         public Task Completion { get; private set; }
         public TlsBridge(PhoneAddress endpoint) {
@@ -134,6 +140,7 @@ namespace PhoneScreen {
                     byte[] tlsReply = ReadExactly(local, 24);
                     if (!TlsProbe.IsTlsHeader(tlsReply)) throw new IOException("ADB did not confirm the switch to TLS.");
                     remote.Write(tlsReply, 0, tlsReply.Length);
+                    secured = true;
                     // Both ends have committed to TLS. ADB performs mutual authentication.
                     // The actual media transport is gated, not a separate preflight socket.
                     // This bridge never decrypts data and never accepts a legacy AUTH/CNXN reply.
@@ -146,7 +153,7 @@ namespace PhoneScreen {
                     CloseClients();
                     try { await Task.WhenAll(toPhone, toHost); } catch { }
                 } catch (Exception ex) {
-                    if (!disposed) error = ex.Message;
+                    if (!disposed) { failure = ex; error = ex.Message; }
                 } finally { CloseClients(); try { listener.Stop(); } catch { } }
             });
         }
@@ -330,7 +337,8 @@ namespace PhoneScreen {
             info.EnvironmentVariables["ADB_SERVER_SOCKET"] = "tcp:" + port;
             info.EnvironmentVariables.Remove("ADB_VENDOR_KEYS");
             info.EnvironmentVariables["ADB_MDNS_AUTO_CONNECT"] = "0";
-            info.EnvironmentVariables["ADB_MDNS_OPENSCREEN"] = "1";
+            // adb's built-in mDNS backend; the Openscreen one misses phones on some networks.
+            info.EnvironmentVariables.Remove("ADB_MDNS_OPENSCREEN");
             info.EnvironmentVariables["ADB"] = Path.Combine(toolDir, "adb.exe");
             info.EnvironmentVariables.Remove("ANDROID_SERIAL");
             info.EnvironmentVariables.Remove("ADB_TRACE");
@@ -388,8 +396,15 @@ namespace PhoneScreen {
                 try {
                     var stdout = ReadBoundedAsync(process.StandardOutput);
                     var stderr = ReadBoundedAsync(process.StandardError);
-                    if (input != null) await process.StandardInput.WriteLineAsync(input);
-                    process.StandardInput.Close();
+                    try {
+                        // Raw ASCII bytes: no console code page or byte order mark can leak into a pairing code.
+                        if (input != null) {
+                            var bytes = Encoding.ASCII.GetBytes(input + "\n");
+                            await process.StandardInput.BaseStream.WriteAsync(bytes, 0, bytes.Length);
+                            await process.StandardInput.BaseStream.FlushAsync();
+                        }
+                        process.StandardInput.Close();
+                    } catch (IOException) { } // adb can exit before reading stdin; its output says why.
                     var wait = Task.Run(() => process.WaitForExit());
                     if (await Task.WhenAny(wait, Task.Delay(timeoutMs)) != wait) {
                         try { process.Kill(); } catch { }
@@ -417,7 +432,7 @@ namespace PhoneScreen {
             process.OutputDataReceived += (s, e) => { if (e.Data != null) output(e.Data); };
             process.ErrorDataReceived += (s, e) => { if (e.Data != null) output(e.Data); };
             process.Start();
-            process.StandardInput.Close();
+            try { process.StandardInput.Close(); } catch (IOException) { }
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             return process;
