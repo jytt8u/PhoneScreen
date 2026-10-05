@@ -261,11 +261,52 @@ namespace PhoneScreen {
         }
     }
 
+    public enum LinkQuality { Excellent, Good, Poor }
+
+    public sealed class LinkReport {
+        public int Median, Worst, Lost, Sent;
+        public LinkQuality Quality;
+        public override string ToString() {
+            return Sent == Lost ? "no ping replies" : "typical " + Median + " ms, worst " + Worst + " ms" + (Lost > 0 ? ", " + Lost + " of " + Sent + " lost" : "");
+        }
+    }
+
+    // Wi-Fi to a phone is often fine on average but spiky. The spikes are what make video stutter
+    // and audio crackle, so the Auto profile sizes its buffers from the 90th percentile, not the average.
+    public static class LinkProbe {
+        public static LinkReport Classify(IList<long> replies, int sent) {
+            var sorted = new List<long>(replies); sorted.Sort();
+            var report = new LinkReport { Sent = sent, Lost = sent - sorted.Count };
+            if (sorted.Count == 0) { report.Quality = LinkQuality.Good; return report; }
+            report.Median = (int)sorted[sorted.Count / 2];
+            report.Worst = (int)sorted[sorted.Count - 1];
+            long p90 = sorted[Math.Max(0, (int)Math.Ceiling(sorted.Count * 0.9) - 1)];
+            if (report.Lost * 4 > sent || p90 > 80 || report.Worst > 200) report.Quality = LinkQuality.Poor;
+            else if (p90 > 20 || report.Worst > 50 || report.Lost > 0) report.Quality = LinkQuality.Good;
+            else report.Quality = LinkQuality.Excellent;
+            return report;
+        }
+        public static async Task<LinkReport> MeasureAsync(IPAddress ip, int count) {
+            var replies = new List<long>();
+            using (var ping = new System.Net.NetworkInformation.Ping()) {
+                for (int i = 0; i < count; i++) {
+                    try {
+                        var reply = await ping.SendPingAsync(ip, 600);
+                        if (reply.Status == System.Net.NetworkInformation.IPStatus.Success) replies.Add(reply.RoundtripTime);
+                    } catch (System.Net.NetworkInformation.PingException) { }
+                    await Task.Delay(60);
+                }
+            }
+            return Classify(replies, count);
+        }
+    }
+
     public sealed class StreamOptions {
         public int Profile;
+        public LinkQuality Link = LinkQuality.Good;
         public AudioMode Audio = AudioMode.Computer;
         public string Codec = "opus";
-        public bool Control = true, Keyboard = true, ScreenOff, Clipboard, OnTop;
+        public bool Control = true, Keyboard = true, ScreenOff, Clipboard, OnTop, KeepAwake = true;
         public string Title = "PhoneScreen";
     }
 
@@ -443,15 +484,21 @@ namespace PhoneScreen {
             if (!local.Success || !Int32.TryParse(local.Groups[1].Value, out localPort) || localPort < 1024 || localPort > 65535)
                 throw new ArgumentException("Screen streaming requires the local TLS bridge.");
             if (o == null || o.Profile < 0 || o.Profile >= StreamPreferences.ProfileCount || (o.Codec != "opus" && o.Codec != "aac")
-                || o.Audio < AudioMode.Off || o.Audio > AudioMode.Both)
+                || o.Audio < AudioMode.Off || o.Audio > AudioMode.Both || o.Link < LinkQuality.Excellent || o.Link > LinkQuality.Poor)
                 throw new ArgumentException("Invalid stream profile.");
             string title = SavedDevice.CleanModel(o.Title);
             var args = new StringBuilder("--serial=" + Quote(endpoint) + " --window-title=" + Quote(title.Length == 0 ? "PhoneScreen" : title) + " --video-codec=h264");
             int audioBuffer;
             switch (o.Profile) {
-                case 1: args.Append(" --max-size=1280 --max-fps=60 --video-bit-rate=6M"); audioBuffer = 50; break;
-                case 2: args.Append(" --max-size=1024 --max-fps=30 --video-bit-rate=3M"); audioBuffer = 160; break;
-                case 3: args.Append(" --max-size=1920 --max-fps=60 --video-bit-rate=12M --video-buffer=150"); audioBuffer = 150; break;
+                case 0:
+                    // Auto: chosen from the link measured when connecting.
+                    if (o.Link == LinkQuality.Excellent) { args.Append(" --max-size=1600 --max-fps=60 --video-bit-rate=8M"); audioBuffer = 60; }
+                    else if (o.Link == LinkQuality.Good) { args.Append(" --max-size=1600 --max-fps=60 --video-bit-rate=6M --video-buffer=60"); audioBuffer = 150; }
+                    else { args.Append(" --max-size=1280 --max-fps=60 --video-bit-rate=4M --video-buffer=100"); audioBuffer = 200; }
+                    break;
+                case 2: args.Append(" --max-size=1280 --max-fps=60 --video-bit-rate=6M"); audioBuffer = 50; break;
+                case 3: args.Append(" --max-size=1024 --max-fps=30 --video-bit-rate=3M"); audioBuffer = 160; break;
+                case 4: args.Append(" --max-size=1920 --max-fps=60 --video-bit-rate=12M --video-buffer=150"); audioBuffer = 150; break;
                 default: args.Append(" --max-size=1600 --max-fps=60 --video-bit-rate=8M"); audioBuffer = 80; break;
             }
             if (o.Audio == AudioMode.Off) args.Append(" --no-audio");
@@ -465,6 +512,8 @@ namespace PhoneScreen {
             else {
                 if (o.Keyboard) args.Append(" --keyboard=uhid");
                 if (o.ScreenOff) args.Append(" --turn-screen-off");
+                // Keep the phone from locking mid-session; scrcpy restores the old timeout on exit.
+                if (o.KeepAwake) args.Append(" --screen-off-timeout=1800");
             }
             if (!o.Control || !o.Clipboard) args.Append(" --no-clipboard-autosync");
             if (o.OnTop) args.Append(" --always-on-top");

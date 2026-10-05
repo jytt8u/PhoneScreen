@@ -10,7 +10,7 @@
 
 <p align="center">See and control your Android phone from Windows, with sound, over your own Wi-Fi.<br>No app on the phone, no account, no cloud.</p>
 
-<p align="center"><a href="https://github.com/jytt8u/PhoneScreen/releases/latest/download/PhoneScreen-1.1.1-win64.zip"><img src="assets/download.svg" alt="Download PhoneScreen for Windows" width="282"></a></p>
+<p align="center"><a href="https://github.com/jytt8u/PhoneScreen/releases/latest/download/PhoneScreen-1.2.0-win64.zip"><img src="assets/download.svg" alt="Download PhoneScreen for Windows" width="282"></a></p>
 <p align="center"><a href="GUIDE.md">Guide</a> · <a href="https://github.com/jytt8u/PhoneScreen/releases/latest">All downloads</a> · <a href="SECURITY.md">Security</a></p>
 
 <p align="center"><img src="assets/screenshot.png" alt="PhoneScreen window: a phone found on the network, the Connect button and QR pairing" width="900"></p>
@@ -31,11 +31,11 @@ No camera? Use **Pair device with pairing code** instead; the address fills in f
 
 | | |
 | :--- | :--- |
-| **Finds your phone** | Uses the same network discovery as Android Studio. When several phones are around, pick one from a list. |
+| **Finds your phone** | Uses the same network discovery as Android Studio, and connects on its own when the phone you used last shows up. When several phones are around, pick one from a list. |
 | **QR pairing** | Scan once and you're done. No IP addresses or ports to copy. |
 | **Sound** | Opus or AAC, on the PC only or on both devices (Android 13+). If the phone can't encode Opus, PhoneScreen switches to AAC and restarts the stream on its own. |
-| **Stays connected** | Notices a dropped Wi-Fi link within a few seconds and reconnects automatically. |
-| **Four profiles** | Balanced, Responsive (lowest delay), Weak Wi-Fi and Movies (buffered for smooth audio/video sync). |
+| **Stays connected** | Notices a dropped Wi-Fi link within a few seconds and reconnects automatically. The phone doesn't lock itself mid-session. |
+| **Smooth on real Wi-Fi** | The Auto profile pings the phone while connecting and picks resolution, bit rate and buffering to match: no delay on a fast link, a little smoothing when the Wi-Fi has spikes. Balanced, Responsive, Weak Wi-Fi and Movies are there if you prefer a fixed setup. |
 | **Input** | Mouse and a hardware keyboard that respects your phone's layout, or view-only. Optional clipboard sharing. |
 | **Fits in** | Dark interface with a dark title bar, follows Windows display scaling, remembers your phone and settings. |
 
@@ -59,7 +59,7 @@ Pairing gives the PC full ADB access to the phone, which is more than screen mir
 Release files aren’t built on anyone’s PC. GitHub Actions builds them from the tagged source in this repository ([release.yml](.github/workflows/release.yml)), downloads scrcpy from its official release, checks every SHA-256 and signs a [build provenance attestation](https://github.com/jytt8u/PhoneScreen/attestations). With the [GitHub CLI](https://cli.github.com/) you can confirm that a file you downloaded came out of that build:
 
 ```powershell
-gh attestation verify PhoneScreen-1.1.1-win64.zip -R jytt8u/PhoneScreen
+gh attestation verify PhoneScreen-1.2.0-win64.zip -R jytt8u/PhoneScreen
 ```
 
 The same works for `PhoneScreen.exe`. If the file was changed in any way, verification fails.

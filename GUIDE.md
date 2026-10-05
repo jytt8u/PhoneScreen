@@ -32,7 +32,8 @@ Click **Change** next to *Stream settings*. Your choices are remembered.
 
 | Setting | What it does |
 | :--- | :--- |
-| Balanced | 1600 px, 60 fps, 8 Mb/s. A good default. |
+| Auto | The default. While connecting, PhoneScreen pings the phone for about a second. On a fast, quiet link it streams 1600 px at 60 fps with no extra delay; if the Wi-Fi has spikes it adds 60–100 ms of buffering (and drops to 1280 px on a really unsteady link) so the picture stays smooth and the sound doesn't crackle. The log shows what it measured. |
+| Balanced | 1600 px, 60 fps, 8 Mb/s, no buffering. |
 | Responsive | 1280 px, 60 fps, short audio buffer. The least delay, for games and quick tapping. |
 | Weak Wi-Fi | 1024 px, 30 fps, 3 Mb/s and a longer audio buffer. For busy or distant Wi-Fi. |
 | Movies | 1920 px, 12 Mb/s, picture and sound both buffered by 150 ms so they stay in sync. |
@@ -44,6 +45,7 @@ Click **Change** next to *Stream settings*. Your choices are remembered.
 | Turn the phone screen off | The phone display goes dark while you work from the PC; mirroring keeps going. |
 | Share clipboard | Copy on one device, paste on the other. Off by default. |
 | Keep window on top | The phone window stays above other windows. |
+| Connect when my phone is found | When the phone you used last turns up on the network, PhoneScreen connects without a click. It won't reconnect after you press Disconnect or close the phone window. |
 
 Handy shortcuts in the phone window: right-click is Back, middle-click is Home, `Alt+F` is fullscreen, `Alt+O` turns the phone screen off and `Alt+Shift+O` turns it back on.
 

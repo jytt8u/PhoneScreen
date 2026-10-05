@@ -67,8 +67,9 @@ namespace PhoneScreen {
 
     sealed class MainForm : Form {
         const string GuideUrl = "https://github.com/jytt8u/PhoneScreen/blob/main/GUIDE.md";
-        static readonly string[] Profiles = { "Balanced", "Responsive", "Weak Wi-Fi", "Movies" };
-        static readonly string[] ProfileHints = { "1600 px · 60 fps · 8 Mb/s", "1280 px · 60 fps · lowest delay", "1024 px · 30 fps · 3 Mb/s", "1920 px · 12 Mb/s · smooth A/V sync" };
+        static readonly string[] Profiles = { "Auto", "Balanced", "Responsive", "Weak Wi-Fi", "Movies" };
+        static readonly string[] ProfileHints = { "Checks your Wi-Fi and adapts", "1600 px · 60 fps · 8 Mb/s", "1280 px · 60 fps · lowest delay", "1024 px · 30 fps · 3 Mb/s", "1920 px · 12 Mb/s · smooth A/V sync" };
+        static readonly string[] LinkModes = { "fast Wi-Fi, lowest delay", "steady Wi-Fi, light buffering", "unsteady Wi-Fi, extra smoothing" };
         static readonly string[] AudioModes = { "Off", "On this PC", "PC and phone" };
         static readonly string[] AudioHints = { "No sound is captured", "The phone goes quiet", "Android 13+, some apps opt out" };
 
@@ -123,7 +124,7 @@ namespace PhoneScreen {
         readonly Label qualityLabel = new Label(), audioLabel = new Label(), codecLabel = new Label();
         readonly Label qualityHint = new Label(), audioHint = new Label(), codecHint = new Label();
         readonly OptionPicker quality = new OptionPicker(), audio = new OptionPicker(), codec = new OptionPicker();
-        readonly Switch control = new Switch(), keyboard = new Switch(), screenOff = new Switch(), clipboard = new Switch(), onTop = new Switch();
+        readonly Switch control = new Switch(), keyboard = new Switch(), screenOff = new Switch(), clipboard = new Switch(), onTop = new Switch(), autoConnect = new Switch();
 
         // Log
         readonly Card logCard = new Card();
@@ -152,6 +153,8 @@ namespace PhoneScreen {
         string connectedModel = "", connectedDetail = "";
         DateTime? streamingSince;
         int reconnects;
+        bool autoTried, userStopped, pendingAuto;
+        string linkNote = "";
         string pendingRestart;
         bool audioWarned, chooseVisible, scrollbar;
 
@@ -161,6 +164,7 @@ namespace PhoneScreen {
             engine = new Engine(root);
             using (var g = Graphics.FromHwnd(IntPtr.Zero)) Theme.Scale = g.DpiX / 96f;
             AutoScaleMode = AutoScaleMode.None;
+            DoubleBuffered = true;
             Text = "PhoneScreen";
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             BackColor = Theme.Bg; ForeColor = Theme.Ink;
@@ -278,8 +282,9 @@ namespace PhoneScreen {
             foreach (var hint in new[] { qualityHint, audioHint, codecHint }) { Lbl(settingsCard, hint, "", 8.5f, Theme.Faint, false); hint.AutoEllipsis = true; }
             control.Text = "Control with mouse and keyboard"; keyboard.Text = "Hardware keyboard (any layout)";
             screenOff.Text = "Turn the phone screen off"; clipboard.Text = "Share clipboard"; onTop.Text = "Keep window on top";
+            autoConnect.Text = "Connect when my phone is found"; autoConnect.Checked = true;
             control.Checked = keyboard.Checked = true;
-            foreach (var item in new[] { control, keyboard, screenOff, clipboard, onTop }) settingsCard.Controls.Add(item);
+            foreach (var item in new[] { control, keyboard, screenOff, clipboard, onTop, autoConnect }) settingsCard.Controls.Add(item);
 
             // Log card
             Lbl(logCard, logTitle, "Connection log", 10, Theme.Muted, true);
@@ -293,7 +298,7 @@ namespace PhoneScreen {
             Controls.Add(body); Controls.Add(footer); Controls.Add(header);
             int tab = 0;
             foreach (Control c in new Control[] { connectFrame, connect, chooseLink, pairToggle, pairAddressFrame, pairCodeFrame, pair, settingsToggle,
-                quality, audio, codec, control, keyboard, screenOff, clipboard, onTop, download, install, guideLink, logLink }) c.TabIndex = tab++;
+                quality, audio, codec, control, keyboard, screenOff, clipboard, onTop, autoConnect, download, install, guideLink, logLink }) c.TabIndex = tab++;
             ResumeLayout(false);
         }
 
@@ -382,7 +387,7 @@ namespace PhoneScreen {
             settingsTitle.SetBounds(cp, S(16), cw - cp * 2 - S(100), S(26));
             settingsSummary.SetBounds(cp, S(42), cw - cp * 2 - S(100), S(20));
             settingsToggle.SetBounds(cw - cp - S(100), S(26), S(100), S(24));
-            foreach (Control c in new Control[] { qualityLabel, audioLabel, codecLabel, quality, audio, codec, qualityHint, audioHint, codecHint, control, keyboard, screenOff, clipboard, onTop })
+            foreach (Control c in new Control[] { qualityLabel, audioLabel, codecLabel, quality, audio, codec, qualityHint, audioHint, codecHint, control, keyboard, screenOff, clipboard, onTop, autoConnect })
                 c.Visible = settingsExpanded;
             if (settingsExpanded) {
                 int col = (cw - cp * 2 - S(24)) / 3, top = S(82);
@@ -396,10 +401,10 @@ namespace PhoneScreen {
                     hints[i].SetBounds(x + S(2), top + S(66), col, S(18));
                 }
                 int half = (cw - cp * 2 - S(24)) / 2, sy = top + S(98);
-                var switches = new[] { control, keyboard, screenOff, clipboard, onTop };
+                var switches = new[] { control, keyboard, screenOff, clipboard, onTop, autoConnect };
                 for (int i = 0; i < switches.Length; i++)
                     switches[i].SetBounds(cp + (i % 2) * (half + S(24)), sy + (i / 2) * S(36), half, S(30));
-                settingsCard.SetBounds(rightX, y, cw, sy + S(3 * 36) + S(10));
+                settingsCard.SetBounds(rightX, y, cw, sy + ((switches.Length + 1) / 2) * S(36) + S(10));
             } else settingsCard.SetBounds(rightX, y, cw, S(78));
             y = settingsCard.Bottom + gap;
 
@@ -427,7 +432,7 @@ namespace PhoneScreen {
             settingsToggle.LinkClicked += (s, e) => ExpandSettings(!settingsExpanded);
             chooseLink.LinkClicked += (s, e) => ChoosePhone();
             connect.Click += async (s, e) => {
-                if (mirror != null) await RunUi(async () => await StopAsync(true));
+                if (mirror != null) { userStopped = true; await RunUi(async () => await StopAsync(true)); }
                 else { reconnects = 0; await RunUi(ConnectAsync); }
             };
             pair.Click += async (s, e) => await RunUi(PairWithCodeAsync);
@@ -469,7 +474,7 @@ namespace PhoneScreen {
             AcceptButton = connect;
             EventHandler settingsChanged = (s, e) => { UpdateControls(); if (!busy) TrySavePreferences(); };
             foreach (var picker in new[] { quality, audio, codec }) picker.SelectedIndexChanged += settingsChanged;
-            foreach (var item in new[] { control, keyboard, screenOff, clipboard, onTop }) item.CheckedChanged += settingsChanged;
+            foreach (var item in new[] { control, keyboard, screenOff, clipboard, onTop, autoConnect }) item.CheckedChanged += settingsChanged;
             timer.Interval = 400;
             timer.Tick += async (s, e) => await Tick();
             timer.Start();
@@ -523,7 +528,7 @@ namespace PhoneScreen {
             foreach (var picker in new Control[] { quality, audio, control }) picker.Enabled = idle;
             codec.Enabled = idle && audio.SelectedIndex != 0;
             keyboard.Enabled = screenOff.Enabled = clipboard.Enabled = idle && control.Checked;
-            onTop.Enabled = idle;
+            onTop.Enabled = autoConnect.Enabled = idle;
             if (!pairAddress.Focused && !pairCode.Focused) AcceptButton = mirror == null ? connect : null;
 
             qualityHint.Text = ProfileHints[quality.SelectedIndex];
@@ -643,6 +648,10 @@ namespace PhoneScreen {
             if (codePairing != null && !pairAddress.Focused && (pairAddress.TextLength == 0 || pairAddress.Tag as string == pairAddress.Text)) {
                 pairAddress.Text = codePairing.Address.ToString(); pairAddress.Tag = pairAddress.Text;
             }
+            // Connect on its own once per appearance of the phone this PC used last.
+            var known = saved.Service.Length > 0 ? found.FirstOrDefault(s => !s.Pairing && s.Name == saved.Service) : null;
+            if (known == null) autoTried = false;
+            else if (!autoTried && !preview && !busy && mirror == null && autoConnect.Checked && !userStopped && connectAddress.Text == known.Address.ToString()) { autoTried = true; pendingAuto = true; }
             if (pairingExpanded && ticket != null && attemptedTicket != ticket.Name) {
                 var scanned = found.FirstOrDefault(s => s.Pairing && s.Name == ticket.Name);
                 if (scanned != null) pendingQr = scanned;
@@ -750,13 +759,22 @@ namespace PhoneScreen {
                 });
                 return;
             }
+            if (pendingAuto) {
+                pendingAuto = false;
+                if (mirror == null && autoConnect.Checked && !userStopped) {
+                    reconnects = 0;
+                    AddLog("Your phone is on the network. Connecting automatically.");
+                    await RunUi(ConnectAsync);
+                }
+                return;
+            }
             if (mirror == null || !mirror.HasExited) return;
             await RunUi(async () => {
                 mirror.WaitForExit();
                 int exit = mirror.ExitCode;
                 bool wasStreaming = streamingSince != null && (DateTime.UtcNow - streamingSince.Value).TotalSeconds > 5;
                 await StopAsync(false);
-                if (exit == 0) { SetStatus("Stream closed", "Press Connect to open it again.", Tone.Neutral); return; }
+                if (exit == 0) { userStopped = true; SetStatus("Stream closed", "Press Connect to open it again.", Tone.Neutral); return; }
                 AddLog("scrcpy exited with code " + exit + ".");
                 // Exit code 2 means the device went away. If it was working, try to come back on our own.
                 if (exit == 2 && wasStreaming && reconnects < 3) {
@@ -832,6 +850,7 @@ namespace PhoneScreen {
             endpoint = await ReachableAsync(endpoint);
             address = endpoint.ToString();
             var target = services.FirstOrDefault(s => !s.Pairing && s.Address.ToString() == address);
+            var linkTest = quality.SelectedIndex == 0 ? LinkProbe.MeasureAsync(endpoint.IP, 16) : null;
             await engine.InitializeAsync();
             bridge = new TlsBridge(endpoint);
             serial = bridge.Serial;
@@ -869,8 +888,16 @@ namespace PhoneScreen {
             connectedModel = market;
             connectedDetail = "Android " + AndroidVersion(sdk) + " · " + endpoint.IP;
 
+            var link = LinkQuality.Good;
+            linkNote = "";
+            if (linkTest != null) {
+                var report = await linkTest;
+                link = report.Quality;
+                linkNote = "Auto: " + LinkModes[(int)link];
+                AddLog("Wi-Fi to the phone: " + report + ". " + linkNote + ".");
+            }
             var options = new StreamOptions {
-                Profile = quality.SelectedIndex, Audio = (AudioMode)audio.SelectedIndex, Codec = codec.SelectedIndex == 0 ? "opus" : "aac",
+                Profile = quality.SelectedIndex, Link = link, Audio = (AudioMode)audio.SelectedIndex, Codec = codec.SelectedIndex == 0 ? "opus" : "aac",
                 Control = control.Checked, Keyboard = keyboard.Checked, ScreenOff = screenOff.Checked, Clipboard = clipboard.Checked, OnTop = onTop.Checked,
                 Title = market.Length > 0 ? market : "PhoneScreen"
             };
@@ -934,7 +961,7 @@ namespace PhoneScreen {
             if (line.IndexOf("Texture:", StringComparison.Ordinal) >= 0) {
                 streamingSince = DateTime.UtcNow; reconnects = 0;
                 if (!audioWarned) SetStatus("Streaming from " + (connectedModel.Length > 0 ? connectedModel : "your phone"),
-                    (options.Audio == AudioMode.Off ? "Sound off" : "Sound on") + " · " + (options.Control ? "mouse and keyboard" : "view only")
+                    (linkNote.Length > 0 ? linkNote + " · " : "") + (options.Audio == AudioMode.Off ? "sound off" : "sound on") + " · " + (options.Control ? "mouse and keyboard" : "view only")
                     + " · Alt+F fullscreen · close the window to stop", Tone.Good);
                 UpdateControls();
             }
@@ -1053,20 +1080,20 @@ namespace PhoneScreen {
                 var prefs = StreamPreferences.Parse(text);
                 quality.SelectedIndex = prefs.Quality; audio.SelectedIndex = (int)prefs.Audio; codec.SelectedIndex = prefs.Codec;
                 control.Checked = prefs.Control; keyboard.Checked = prefs.Keyboard; screenOff.Checked = prefs.ScreenOff;
-                clipboard.Checked = prefs.Clipboard; onTop.Checked = prefs.OnTop;
+                clipboard.Checked = prefs.Clipboard; onTop.Checked = prefs.OnTop; autoConnect.Checked = prefs.AutoConnect;
             } catch { }
         }
         void TrySavePreferences() {
             if (preview) return;
             try {
                 var prefs = new StreamPreferences { Quality = quality.SelectedIndex, Audio = (AudioMode)audio.SelectedIndex, Codec = codec.SelectedIndex,
-                    Control = control.Checked, Keyboard = keyboard.Checked, ScreenOff = screenOff.Checked, Clipboard = clipboard.Checked, OnTop = onTop.Checked };
-                File.WriteAllText(DataPath("preferences.txt"), prefs.Encode(), Encoding.UTF8);
+                    Control = control.Checked, Keyboard = keyboard.Checked, ScreenOff = screenOff.Checked, Clipboard = clipboard.Checked, OnTop = onTop.Checked, AutoConnect = autoConnect.Checked };
+                File.WriteAllText(DataPath("preferences.txt"), prefs.Encode(), new UTF8Encoding(false));
             } catch (Exception ex) { AddLog("Couldn't save settings: " + ex.Message); }
         }
         void TrySaveDevice() {
             if (preview) return;
-            try { File.WriteAllText(DataPath("device.txt"), saved.Encode(), Encoding.UTF8); }
+            try { File.WriteAllText(DataPath("device.txt"), saved.Encode(), new UTF8Encoding(false)); }
             catch (Exception ex) { AddLog("Couldn't save the phone: " + ex.Message); }
         }
         string EnsureIcon() {

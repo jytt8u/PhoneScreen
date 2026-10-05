@@ -7,13 +7,14 @@ namespace PhoneScreen {
     public enum AudioMode { Off = 0, Computer = 1, Both = 2 }
 
     public sealed class StreamPreferences {
-        public const int ProfileCount = 4;
+        // 0 Auto, 1 Balanced, 2 Responsive, 3 Weak Wi-Fi, 4 Movies
+        public const int ProfileCount = 5;
         public int Quality, Codec;
         public AudioMode Audio = AudioMode.Computer;
-        public bool Control = true, Keyboard = true, ScreenOff, Clipboard, OnTop;
+        public bool Control = true, Keyboard = true, ScreenOff, Clipboard, OnTop, AutoConnect = true;
 
         public string Encode() {
-            return String.Join("|", new[] { "2", N(Quality), N((int)Audio), N(Codec), B(Control), B(Keyboard), B(ScreenOff), B(Clipboard), B(OnTop) });
+            return String.Join("|", new[] { "3", N(Quality), N((int)Audio), N(Codec), B(Control), B(Keyboard), B(ScreenOff), B(Clipboard), B(OnTop), B(AutoConnect) });
         }
         static string N(int value) { return value.ToString(CultureInfo.InvariantCulture); }
         static string B(bool value) { return value ? "1" : "0"; }
@@ -21,13 +22,15 @@ namespace PhoneScreen {
         public static StreamPreferences Parse(string text) {
             var fields = (text ?? "").Trim().Split('|');
             if (fields.Length == 8 && fields[0] == "1") return ParseVersion1(fields);
-            if (fields.Length != 9 || fields[0] != "2") return new StreamPreferences();
-            int[] limits = { ProfileCount - 1, 2, 1, 1, 1, 1, 1, 1 };
-            var values = new int[limits.Length];
+            bool v2 = fields.Length == 9 && fields[0] == "2";
+            if (!v2 && (fields.Length != 10 || fields[0] != "3")) return new StreamPreferences();
+            // 1.1.0 had no Auto profile. Its default (Balanced) becomes Auto; the others move up by one.
+            int[] limits = { v2 ? 3 : ProfileCount - 1, 2, 1, 1, 1, 1, 1, 1, 1 };
+            var values = new int[fields.Length - 1];
             for (int i = 0; i < values.Length; i++)
                 if (!Int32.TryParse(fields[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out values[i]) || values[i] > limits[i]) return new StreamPreferences();
-            return new StreamPreferences { Quality = values[0], Audio = (AudioMode)values[1], Codec = values[2], Control = values[3] == 1,
-                Keyboard = values[4] == 1, ScreenOff = values[5] == 1, Clipboard = values[6] == 1, OnTop = values[7] == 1 };
+            return new StreamPreferences { Quality = v2 && values[0] > 0 ? values[0] + 1 : values[0], Audio = (AudioMode)values[1], Codec = values[2], Control = values[3] == 1,
+                Keyboard = values[4] == 1, ScreenOff = values[5] == 1, Clipboard = values[6] == 1, OnTop = values[7] == 1, AutoConnect = v2 || values[8] == 1 };
         }
 
         // 1.0 stored: version|quality|sound|duplicate|control|keyboard|screenOff|codec
@@ -35,8 +38,8 @@ namespace PhoneScreen {
             var values = new int[7];
             for (int i = 0; i < values.Length; i++)
                 if (!Int32.TryParse(fields[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out values[i]) || values[i] > (i == 0 ? 2 : 1)) return new StreamPreferences();
-            // Old profiles: 0 balanced, 1 low bandwidth, 2 video. New order: balanced, responsive, weak Wi-Fi, movies.
-            int[] profile = { 0, 2, 3 };
+            // 1.0 profiles: 0 balanced (the default, now Auto), 1 low bandwidth, 2 video.
+            int[] profile = { 0, 3, 4 };
             return new StreamPreferences { Quality = profile[values[0]], Audio = values[1] == 0 ? AudioMode.Off : values[2] == 1 ? AudioMode.Both : AudioMode.Computer,
                 Control = values[3] == 1, Keyboard = values[4] == 1, ScreenOff = values[5] == 1, Codec = values[6] };
         }

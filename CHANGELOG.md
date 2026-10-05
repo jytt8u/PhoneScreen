@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 — 2026-10-05
+
+- **Auto profile, now the default.** PhoneScreen pings the phone while connecting and sizes resolution, bit rate and video/audio buffering to the link. A quiet link gets no added delay; a link with spikes (typical home Wi-Fi with a phone in power-save) gets just enough buffering to stop stutter and audio crackle. Settings from 1.1 that were left on the default move to Auto.
+- **Connects by itself** when the phone you used last appears on the network. Turn it off under Stream settings. It stays off for the session after you disconnect.
+- **The phone stays awake** while streaming; the old screen timeout comes back when the session ends.
+- Settings files are written without a byte order mark.
+
 ## 1.1.1 — 2026-10-05
 
 Fixes for phones that wouldn’t connect. Tested with a Samsung Galaxy A51 on Android 13.
