@@ -86,7 +86,7 @@ To run the tests and build the portable ZIP:
 .\pack.ps1
 ```
 
-The current build passed 97 local logic/runtime checks and 26 interface checks. These cover the loopback TLS transport, runtime integrity, saved settings, discovery and pairing data, adaptive profiles, and window layouts at 100%, 125% and 150% display scaling. GitHub Actions also checks the tagged source before publishing a release.
+The current build passed 97 local logic/runtime checks and 26 interface checks. These cover the loopback TLS transport, runtime integrity, saved settings, discovery and pairing data, adaptive profiles, and window layouts at 100% and 150% display scaling. GitHub Actions also checks the tagged source before publishing a release.
 
 ## Credits
 
