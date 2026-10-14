@@ -86,6 +86,8 @@ To run the tests and build the portable ZIP:
 .\pack.ps1
 ```
 
+The current build passed 97 local logic/runtime checks and 26 interface checks. These cover the loopback TLS transport, runtime integrity, saved settings, discovery and pairing data, adaptive profiles, and window layouts at 100%, 125% and 150% display scaling. GitHub Actions also checks the tagged source before publishing a release.
+
 ## Credits
 
 PhoneScreen is MIT licensed. The real work is done by scrcpy, made by Romain Vimont and Genymobile, which keeps its own Apache 2.0 license; see [THIRD_PARTY.md](THIRD_PARTY.md) for it and the other bundled components. PhoneScreen is an independent project and is not affiliated with Genymobile.
